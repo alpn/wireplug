@@ -1,9 +1,8 @@
 [package]
-name = "client"
+name = "shared"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-shared = { path = "../shared" }
 serde = { version = "1.0", features = ["derive"] }
 bincode = { version = "2.0", features = ["serde"] }
