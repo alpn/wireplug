@@ -4,7 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use shared::{WireplugAnnounce, WireplugResponse, BINCODE_CONFIG};
+use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;

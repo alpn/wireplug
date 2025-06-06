@@ -1,13 +1,15 @@
-use shared::{WireplugAnnounce, WireplugResponse, BINCODE_CONFIG};
+use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use std::{
+    env::{self},
     io::{Read, Write},
-    net::TcpStream,
+    net::{TcpStream, ToSocketAddrs},
     thread,
     time::Duration,
 };
 
-fn send_announcement() {
-    match TcpStream::connect("10.0.0.1:4455") {
+fn send_announcement<T: ToSocketAddrs>(t: T) {
+    //-> std::io::Result<()> {
+    match TcpStream::connect(t) {
         Ok(mut s) => {
             let hello = WireplugAnnounce::new(
                 "alicealicealicealicealicealicealicealicealic",
@@ -25,10 +27,15 @@ fn send_announcement() {
     }
 }
 fn main() {
-    loop {
-        println!("sending announcement..");
-        send_announcement();
-        println!("waiting..");
-        thread::sleep(Duration::from_secs(3));
+    let args: Vec<String> = env::args().collect();
+    if args.len() == 2 {
+        loop {
+            println!("sending announcement..");
+            send_announcement(&args[1]);
+            println!("waiting..");
+            thread::sleep(Duration::from_secs(3));
+        }
+    } else {
+        eprintln!("usage");
     }
 }
