@@ -1,7 +1,15 @@
+use bincode::config::Configuration;
 use bincode::{Decode, Encode};
 use std::net::IpAddr;
 
 const PROTOCOL: &str = "Wireplug_V1";
+pub const BINCODE_CONFIG: Configuration<
+    bincode::config::LittleEndian,
+    bincode::config::Fixint,
+    bincode::config::Limit<256>,
+> = bincode::config::standard()
+    .with_fixed_int_encoding()
+    .with_limit::<256>();
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugAnnounce {

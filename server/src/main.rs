@@ -4,8 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bincode::config::Configuration;
-use shared::{WireplugAnnounce, WireplugResponse};
+use shared::{WireplugAnnounce, WireplugResponse, BINCODE_CONFIG};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
@@ -14,10 +13,9 @@ use tokio::sync::RwLock;
 use openbsd::pledge;
 
 type Storage = Arc<RwLock<HashMap<(String, String), IpAddr>>>;
-const BINCODE_CONFIG: Configuration = bincode::config::standard();
 
 async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::Result<()> {
-    let mut buffer = [0u8; 1024];
+    let mut buffer = [0u8; 128];
     socket.read(&mut buffer).await?;
     let (hello, _): (WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG).map_err(|e| {
@@ -29,7 +27,7 @@ async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::
 
     let ip = socket.peer_addr()?;
     if !hello.valid() {
-        //println!("got bs from {}" ,ip.to_string());
+        //println!("got bs from {}", ip.to_string());
         socket.shutdown().await?;
         return Ok(());
     }

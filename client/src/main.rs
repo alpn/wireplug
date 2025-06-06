@@ -1,4 +1,4 @@
-use shared::{WireplugAnnounce, WireplugResponse};
+use shared::{WireplugAnnounce, WireplugResponse, BINCODE_CONFIG};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -13,13 +13,12 @@ fn send_announcement() {
                 "alicealicealicealicealicealicealicealicealic",
                 "bobbobbobbobbobbobbobbobbobbobbobbobbobbobbo",
             );
-            let config = bincode::config::standard();
-            let v = bincode::encode_to_vec(&hello, config).unwrap();
+            let v = bincode::encode_to_vec(&hello, BINCODE_CONFIG).unwrap();
             s.write_all(&v).unwrap();
             let mut res = [0u8; 1024];
             s.read(&mut res).ok().unwrap();
             let (response, _): (WireplugResponse, usize) =
-                bincode::decode_from_slice(&res[..], config).unwrap();
+                bincode::decode_from_slice(&res[..], BINCODE_CONFIG).unwrap();
             println!("response: {:?}", response);
         }
         Err(e) => eprintln!("{:?}", e),
