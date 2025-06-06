@@ -143,6 +143,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "openbsd"
+version = "0.1.2"
+source = "git+https://github.com/joshua-cooper/openbsd-rs#90d7af48b85b9ceb26464658e584feb232558c5e"
+
+[[package]]
 name = "parking_lot"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +240,7 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "openbsd",
  "serde",
  "shared",
  "tokio",

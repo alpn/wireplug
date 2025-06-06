@@ -8,3 +8,6 @@ tokio = { version = "1", features = ["full"] }
 shared = { path = "../shared" }
 serde = { version = "1.0", features = ["derive"] }
 bincode = { version = "2.0", features = ["serde"] }
+
+[target.'cfg(target_os = "openbsd")'.dependencies]
+openbsd = { git = "https://github.com/joshua-cooper/openbsd-rs", version = "0.1.2" }

@@ -10,6 +10,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::RwLock;
 
+#[cfg(target_os = "openbsd")]
+use openbsd::pledge;
+
 type Storage = Arc<RwLock<HashMap<(String, String), IpAddr>>>;
 const BINCODE_CONFIG : Configuration= bincode::config::standard();
 
@@ -52,6 +55,14 @@ async fn status(storage: &Storage) {
 }
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+
+    #[cfg(target_os = "openbsd")]
+    openbsd::pledge!("stdio inet", "").map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("pledge: {}", e.to_string()),
+        )
+    })?;
 
     let listener = TcpListener::bind("0.0.0.0:4455").await?;
     let storage: Storage= Arc::new(RwLock::new(HashMap::new()));
