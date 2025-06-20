@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::{thread, time::Duration};
 
+pub mod config;
 pub mod protocol;
 pub mod wg_interface;
 

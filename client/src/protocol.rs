@@ -60,7 +60,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
                 Some(r) => {
                     if let Some(ip) = r.ip {
                         println!("| wireplug.org: peer is @{}" ,ip);
-                        wg_interface::update_interface(&iface, &peer, ip);
+                        wg_interface::update(&iface, &peer, ip);
                     } else {
                         println!("| wireplug.org: peer is unknown");
                     }
