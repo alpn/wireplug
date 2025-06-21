@@ -101,7 +101,6 @@ pub(crate) fn configure(ifname: &String) {
 }
 
 pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: SocketAddr) {
-
     println!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),

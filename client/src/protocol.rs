@@ -1,10 +1,10 @@
 use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
-use wireguard_control::{Backend, Device, Key};
 use std::{
     io::{Read, Write},
     net::TcpStream,
     time::{Duration, SystemTime},
 };
+use wireguard_control::{Backend, Device, Key};
 
 use crate::wg_interface;
 const WIREPLUG_ORG: &str = "wireplug.org:4455";
@@ -14,11 +14,18 @@ pub(crate) const MONITORING_INTERVAL: u64 = 30;
 const LAST_HANDSHAKE_MAX: u64 = 125;
 const RETRY_INTERVAL_SEC: u64 = 10;
 
-fn send_announcement(initiator_pubkey: &Key, peer_pubkey: &Key, port: u16) -> Option<WireplugResponse> {
+fn send_announcement(
+    initiator_pubkey: &Key,
+    peer_pubkey: &Key,
+    port: u16,
+) -> Option<WireplugResponse> {
     match TcpStream::connect(WIREPLUG_ORG) {
         Ok(mut stream) => {
-            let announcement =
-                WireplugAnnounce::new(&initiator_pubkey.to_base64(), &peer_pubkey.to_base64(), port);
+            let announcement = WireplugAnnounce::new(
+                &initiator_pubkey.to_base64(),
+                &peer_pubkey.to_base64(),
+                port,
+            );
             let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG).unwrap();
             stream.write_all(&buf).unwrap();
             let mut res = [0u8; 1024];
@@ -46,7 +53,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
 
     for peer in device.peers {
         print!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
-        let annouce ;
+        let annouce;
         if let Some(last_handshake) = peer.stats.last_handshake_time {
             let duration = now.duration_since(last_handshake).unwrap();
             print!("last handshake {} seconds ago => ", duration.as_secs(),);
@@ -60,7 +67,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
             match send_announcement(&pubkey, &peer.config.public_key, port) {
                 Some(r) => {
                     if let Some(ip) = r.ip {
-                        println!("| wireplug.org: peer is @{}" ,ip);
+                        println!("| wireplug.org: peer is @{}", ip);
                         wg_interface::update(&iface, &peer, ip);
                     } else {
                         println!("| wireplug.org: peer is unknown");
@@ -68,8 +75,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
                 }
                 None => (),
             }
-        }
-        else {
+        } else {
             println!("doing nothing");
         }
     }

@@ -1,6 +1,6 @@
 use bincode::config::Configuration;
 use bincode::{Decode, Encode};
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 const PROTOCOL: &str = "Wireplug_V1";
 pub const BINCODE_CONFIG: Configuration<
@@ -11,12 +11,23 @@ pub const BINCODE_CONFIG: Configuration<
     .with_fixed_int_encoding()
     .with_limit::<256>();
 
+fn is_valid_wgkey(s: &String) -> bool {
+    if s.len() != 44 {
+        return false;
+    }
+    for c in s.chars() {
+        if !c.is_ascii_alphanumeric() && c != '+' && c != '/' && c != '=' {
+            return false;
+        }
+    }
+    true
+}
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugAnnounce {
     proto: String,
     pub initiator_pubkey: String,
     pub peer_pubkey: String,
-    pub listen_port: u16
+    pub listen_port: u16,
 }
 
 impl WireplugAnnounce {
@@ -25,11 +36,14 @@ impl WireplugAnnounce {
             proto: String::from(PROTOCOL),
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkey: peer_pubkey.to_owned(),
-            listen_port: port
+            listen_port: port,
         }
     }
     pub fn valid(&self) -> bool {
-        self.proto.eq(PROTOCOL) && self.initiator_pubkey.len() == 44 && self.peer_pubkey.len() == 44 && self.listen_port >= 1024
+        self.proto.eq(PROTOCOL)
+            && is_valid_wgkey(&self.initiator_pubkey)
+            && is_valid_wgkey(&self.peer_pubkey)
+            && self.listen_port >= 1024
     }
 }
 

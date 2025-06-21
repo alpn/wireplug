@@ -14,7 +14,6 @@ struct Cli {
 }
 
 fn main() {
-
     let cli = Cli::parse();
     let ifname = &cli.interface_name;
     wg_interface::show_config(ifname);
