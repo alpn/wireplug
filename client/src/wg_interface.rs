@@ -100,23 +100,15 @@ pub(crate) fn configure(ifname: &String) {
     add_route(&ifname, addr);
 }
 
-pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_ip: IpAddr) {
-    let port;
-    if let Some(endpoint) = peer.config.endpoint {
-        port = endpoint.port();
-    } else {
-        port = config::get_default_port();
-    }
+pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: SocketAddr) {
 
     println!(
-        "updating if:{} peer {} @ {}:{}",
+        "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),
         peer.config.public_key.to_base64(),
-        new_ip.to_string(),
-        port.to_string()
+        new_endpoint.to_string(),
     );
 
-    let new_endpoint = SocketAddr::new(new_ip, port);
     let peer_config = PeerConfigBuilder::new(&peer.config.public_key).set_endpoint(new_endpoint);
     let update = DeviceUpdate::new().add_peers(&[peer_config]);
     update.apply(iface, Backend::default()).unwrap();

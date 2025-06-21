@@ -14,11 +14,11 @@ pub(crate) const MONITORING_INTERVAL: u64 = 30;
 const LAST_HANDSHAKE_MAX: u64 = 125;
 const RETRY_INTERVAL_SEC: u64 = 10;
 
-fn send_announcement(initiator_pubkey: &Key, peer_pubkey: &Key) -> Option<WireplugResponse> {
+fn send_announcement(initiator_pubkey: &Key, peer_pubkey: &Key, port: u16) -> Option<WireplugResponse> {
     match TcpStream::connect(WIREPLUG_ORG) {
         Ok(mut stream) => {
             let announcement =
-                WireplugAnnounce::new(&initiator_pubkey.to_base64(), &peer_pubkey.to_base64());
+                WireplugAnnounce::new(&initiator_pubkey.to_base64(), &peer_pubkey.to_base64(), port);
             let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG).unwrap();
             stream.write_all(&buf).unwrap();
             let mut res = [0u8; 1024];
@@ -41,6 +41,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
     }
 
     let pubkey = &device.public_key.clone().unwrap();
+    let port = device.listen_port.unwrap();
     let now = SystemTime::now();
 
     for peer in device.peers {
@@ -56,7 +57,7 @@ pub(crate) fn monitor_interface(if_name: &String) {
         }
         if annouce {
             print!("sending announcement.. ");
-            match send_announcement(&pubkey, &peer.config.public_key) {
+            match send_announcement(&pubkey, &peer.config.public_key, port) {
                 Some(r) => {
                     if let Some(ip) = r.ip {
                         println!("| wireplug.org: peer is @{}" ,ip);

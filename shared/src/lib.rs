@@ -1,6 +1,6 @@
 use bincode::config::Configuration;
 use bincode::{Decode, Encode};
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 
 const PROTOCOL: &str = "Wireplug_V1";
 pub const BINCODE_CONFIG: Configuration<
@@ -16,28 +16,30 @@ pub struct WireplugAnnounce {
     proto: String,
     pub initiator_pubkey: String,
     pub peer_pubkey: String,
+    pub listen_port: u16
 }
 
 impl WireplugAnnounce {
-    pub fn new(initiator_pubkey: &String, peer_pubkey: &String) -> Self {
+    pub fn new(initiator_pubkey: &String, peer_pubkey: &String, port: u16) -> Self {
         WireplugAnnounce {
             proto: String::from(PROTOCOL),
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkey: peer_pubkey.to_owned(),
+            listen_port: port
         }
     }
     pub fn valid(&self) -> bool {
-        self.proto.eq(PROTOCOL) && self.initiator_pubkey.len() == 44 && self.peer_pubkey.len() == 44
+        self.proto.eq(PROTOCOL) && self.initiator_pubkey.len() == 44 && self.peer_pubkey.len() == 44 && self.listen_port >= 1024
     }
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
-    pub ip: Option<IpAddr>,
+    pub ip: Option<SocketAddr>,
 }
 
 impl WireplugResponse {
-    pub fn new(ip: Option<IpAddr>) -> Self {
+    pub fn new(ip: Option<SocketAddr>) -> Self {
         WireplugResponse { ip: ip }
     }
 }

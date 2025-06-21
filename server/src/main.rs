@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
-use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -12,12 +12,17 @@ use tokio::sync::RwLock;
 #[cfg(target_os = "openbsd")]
 use openbsd::pledge;
 
-type Storage = Arc<RwLock<HashMap<(String, String), IpAddr>>>;
+#[derive(Clone, Copy)]
+struct Record {
+    pub ip: SocketAddr,
+    pub timestamp: SystemTime,
+}
+type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
 async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::Result<()> {
-    let mut buffer = [0u8; 128];
+    let mut buffer = [0u8; 1024];
     socket.read(&mut buffer).await?;
-    let (hello, _): (WireplugAnnounce, usize) =
+    let (announcement, _): (WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG).map_err(|e| {
             std::io::Error::new(
                 ErrorKind::Other,
@@ -25,26 +30,34 @@ async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::
             )
         })?;
 
-    let ip = socket.peer_addr()?;
-    if !hello.valid() {
+    let announcer_ip = socket.peer_addr()?;
+    if !announcement.valid() {
         //println!("got bs from {}", ip.to_string());
         socket.shutdown().await?;
         return Ok(());
     }
 
+    let addr = SocketAddr::new(announcer_ip.ip(), announcement.listen_port);
     storage.write().await.insert(
         (
-            hello.initiator_pubkey.to_owned(),
-            hello.peer_pubkey.to_owned(),
+            announcement.initiator_pubkey.to_owned(),
+            announcement.peer_pubkey.to_owned(),
         ),
-        ip.ip(),
+        Record {
+            ip: addr,
+            timestamp: SystemTime::now(),
+        },
     );
 
-    let ip = storage
+    let ip = match storage
         .read()
         .await
-        .get(&(hello.peer_pubkey, hello.initiator_pubkey))
-        .copied();
+        .get(&(announcement.peer_pubkey, announcement.initiator_pubkey))
+        .copied()
+    {
+        Some(record) => Some(record.ip),
+        None => None,
+    };
     let hello = WireplugResponse::new(ip);
     let v = bincode::encode_to_vec(&hello, BINCODE_CONFIG).map_err(|e| {
         std::io::Error::new(
@@ -64,7 +77,7 @@ async fn status(storage: &Storage) {
     for p in storage.read().await.iter() {
         let peer_a = &p.0.0;
         let peer_b = &p.0.1;
-        let ip = p.1;
+        let ip = p.1.ip;
         println!("\t{peer_a} @{ip}");
         println!("\ttell {peer_b}");
     }
