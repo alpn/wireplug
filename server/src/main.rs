@@ -14,14 +14,14 @@ use openbsd::pledge;
 
 #[derive(Clone, Copy)]
 struct Record {
-    pub ip: SocketAddr,
+    pub endpoint: SocketAddr,
     pub timestamp: SystemTime,
 }
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
-async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::Result<()> {
+async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::Result<()> {
     let mut buffer = [0u8; 1024];
-    socket.read(&mut buffer).await?;
+    stream.read(&mut buffer).await?;
     let (announcement, _): (WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG).map_err(|e| {
             std::io::Error::new(
@@ -30,10 +30,10 @@ async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::
             )
         })?;
 
-    let announcer_ip = socket.peer_addr()?;
+    let announcer_ip = stream.peer_addr()?;
     if !announcement.valid() {
         //println!("got bs from {}", ip.to_string());
-        socket.shutdown().await?;
+        stream.shutdown().await?;
         return Ok(());
     }
 
@@ -44,29 +44,29 @@ async fn handle_connection(mut socket: TcpStream, storage: Storage) -> std::io::
             announcement.peer_pubkey.to_owned(),
         ),
         Record {
-            ip: addr,
+            endpoint: addr,
             timestamp: SystemTime::now(),
         },
     );
 
-    let ip = match storage
+    let peer_endpoint = match storage
         .read()
         .await
         .get(&(announcement.peer_pubkey, announcement.initiator_pubkey))
         .copied()
     {
-        Some(record) => Some(record.ip),
+        Some(record) => Some(record.endpoint),
         None => None,
     };
-    let hello = WireplugResponse::new(ip);
-    let v = bincode::encode_to_vec(&hello, BINCODE_CONFIG).map_err(|e| {
+    let response = WireplugResponse::new(peer_endpoint);
+    let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG).map_err(|e| {
         std::io::Error::new(
             ErrorKind::Other,
             format!("encoding error: {}", e.to_string()),
         )
     })?;
-    socket.write_all(&v).await?;
-    socket.shutdown().await?;
+    stream.write_all(&buffer).await?;
+    stream.shutdown().await?;
 
     Ok(())
 }
@@ -77,7 +77,7 @@ async fn status(storage: &Storage) {
     for p in storage.read().await.iter() {
         let peer_a = &p.0.0;
         let peer_b = &p.0.1;
-        let ip = p.1.ip;
+        let ip = p.1.endpoint;
         println!("\t{peer_a} @{ip}");
         println!("\ttell {peer_b}");
     }
