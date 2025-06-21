@@ -3,6 +3,7 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use chrono::{DateTime, Local, Utc};
 
 use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -78,8 +79,9 @@ async fn status(storage: &Storage) {
         let peer_a = &p.0.0;
         let peer_b = &p.0.1;
         let ip = p.1.endpoint;
-        println!("\t{peer_a} @{ip}");
-        println!("\ttell {peer_b}");
+        let timestamp = &p.1.timestamp;
+        let datetime: chrono::DateTime<Utc> = (*timestamp).into();
+        println!("\t{peer_a} @{ip} -> {peer_b} | {}" ,datetime);
     }
 }
 #[tokio::main]
