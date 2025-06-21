@@ -19,11 +19,11 @@ pub struct WireplugAnnounce {
 }
 
 impl WireplugAnnounce {
-    pub fn new(pubkey: &str, peer: &str) -> Self {
+    pub fn new(initiator_pubkey: &String, peer_pubkey: &String) -> Self {
         WireplugAnnounce {
             proto: String::from(PROTOCOL),
-            initiator_pubkey: pubkey.to_string(),
-            peer_pubkey: peer.to_string(),
+            initiator_pubkey: initiator_pubkey.to_owned(),
+            peer_pubkey: peer_pubkey.to_owned(),
         }
     }
     pub fn valid(&self) -> bool {
@@ -33,7 +33,7 @@ impl WireplugAnnounce {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
-    ip: Option<IpAddr>,
+    pub ip: Option<IpAddr>,
 }
 
 impl WireplugResponse {
