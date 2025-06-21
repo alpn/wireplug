@@ -105,6 +105,20 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
+    let s = Arc::clone(&storage);
+    tokio::spawn(async move {
+        loop {
+            async {
+                let now = SystemTime::now();
+                s.write().await.retain(|_, r| {
+                    now.duration_since(r.timestamp).unwrap() < Duration::from_secs(60 * 60)
+                });
+            }
+            .await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    });
+
     loop {
         let (socket, _) = listener.accept().await?;
         let s = Arc::clone(&storage);
