@@ -1,9 +1,9 @@
+use chrono::Utc;
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use chrono::{DateTime, Local, Utc};
 
 use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -19,6 +19,8 @@ struct Record {
     pub timestamp: SystemTime,
 }
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
+
+const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 
 async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::Result<()> {
     let mut buffer = [0u8; 1024];
@@ -81,7 +83,7 @@ async fn status(storage: &Storage) {
         let ip = p.1.endpoint;
         let timestamp = &p.1.timestamp;
         let datetime: chrono::DateTime<Utc> = (*timestamp).into();
-        println!("\t{peer_a} @{ip} -> {peer_b} | {}" ,datetime);
+        println!("\t{peer_a} @{ip} -> {peer_b} | {}", datetime);
     }
 }
 #[tokio::main]
@@ -111,7 +113,12 @@ async fn main() -> std::io::Result<()> {
             async {
                 let now = SystemTime::now();
                 s.write().await.retain(|_, r| {
-                    now.duration_since(r.timestamp).unwrap() < Duration::from_secs(60 * 60)
+                    if let Ok(duration_since_last_handshake) = now.duration_since(r.timestamp) {
+                        if duration_since_last_handshake < Duration::from_secs(RECORD_TIMEOUT_SEC) {
+                            return true;
+                        }
+                    }
+                    false
                 });
             }
             .await;
