@@ -25,7 +25,10 @@ fn main() {
 
     println!("attempting to monitor interface {}..", ifname);
     loop {
-        protocol::monitor_interface(ifname);
+        if let Err(e) = protocol::monitor_interface(ifname) {
+            eprintln!("Fatal Error: {e}");
+            std::process::exit(1);
+        }
         thread::sleep(Duration::from_secs(protocol::MONITORING_INTERVAL));
     }
 }
