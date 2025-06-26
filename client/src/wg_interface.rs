@@ -1,4 +1,6 @@
-use std::net::{IpAddr, SocketAddr};
+#[cfg(any(target_os = "macos", target_os = "openbsd"))]
+use std::io;
+use std::net::SocketAddr;
 
 use ipnet::IpNet;
 use wireguard_control::{
@@ -7,10 +9,10 @@ use wireguard_control::{
 
 use crate::config;
 
-pub(crate) fn show_config(ifname: &String) {
+pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     println!("=========== if: {ifname} ===========");
-    let ifname: InterfaceName = ifname.parse().unwrap();
-    let dev = Device::get(&ifname, Backend::default()).unwrap();
+    let ifname: InterfaceName = ifname.parse()?;
+    let dev = Device::get(&ifname, Backend::default())?;
     if let Some(public_key) = dev.public_key {
         println!("public key: {}", public_key.to_base64());
     }
@@ -30,25 +32,31 @@ pub(crate) fn show_config(ifname: &String) {
         println!("\t---------------------------------");
     }
     println!("\n\n");
+
+    Ok(())
 }
 
-//fn cmd(bin: &str, args: &[&str]) { //-> Result<std::process::Output, io::Error> {
-fn cmd(bin: &str, args: &[&str]) -> Option<std::process::Output> {
-    let output = std::process::Command::new(bin).args(args).output().unwrap();
+#[cfg(any(target_os = "macos", target_os = "openbsd"))]
+fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
+    let output = std::process::Command::new(bin).args(args).output()?;
     if output.status.success() {
-        return Some(output);
+        Ok(output)
     } else {
-        println!(
-            "failed to run {} {} command: {}",
-            bin,
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr)
-        );
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "failed to run {} {} command: {}",
+                bin,
+                args.join(" "),
+                String::from_utf8_lossy(&output.stderr)
+            ),
+        ))
     }
-    None
 }
-
-pub fn set_addr(interface: &InterfaceName, addr: IpNet) {
+pub fn set_addr(
+    interface: &InterfaceName,
+    addr: IpNet,
+) -> Result<std::process::Output, std::io::Error> {
     let output = cmd(
         "ifconfig",
         &[
@@ -58,12 +66,13 @@ pub fn set_addr(interface: &InterfaceName, addr: IpNet) {
             &addr.addr().to_string(),
             "alias",
         ],
-    )
-    .unwrap();
-    println!("output: {:?}", output);
+    )?;
+    println!("set_addr: {:?}", output);
+    Ok(output)
 }
 
-pub fn add_route(interface: &InterfaceName, cidr: IpNet) {
+#[cfg(target_os = "macos")]
+pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Error> {
     let output = cmd(
         "route",
         &[
@@ -78,29 +87,35 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) {
             "-interface",
             &interface.to_string(),
         ],
-    )
-    .unwrap();
+    )?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
-        println!(
-            "failed to add route for device {} ({}): {}",
-            &interface, interface, stderr
-        );
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "failed to add route for device {} ({}): {}",
+                &interface, interface.to_string(), stderr
+            ),
+        ))
+    } else {
+        Ok(!stderr.contains("File exists"))
     }
 }
 
-pub(crate) fn configure(ifname: &String) {
+pub(crate) fn configure(ifname: &String) -> Result<(), std::io::Error> {
     println!("configuring interface {}..", ifname);
-    let ifname: InterfaceName = ifname.parse().unwrap();
+    let ifname: InterfaceName = ifname.parse()?;
     let update = config::create_interface_config();
-    update.apply(&ifname, Backend::default()).unwrap();
+    update.apply(&ifname, Backend::default())?;
 
     let addr = config::get_addr();
-    set_addr(&ifname, addr);
-    add_route(&ifname, addr);
+    set_addr(&ifname, addr)?;
+    add_route(&ifname, addr)?;
+
+    Ok(())
 }
 
-pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: SocketAddr) {
+pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: SocketAddr) -> Result<(), std::io::Error> {
     println!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),
@@ -110,5 +125,7 @@ pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: Socke
 
     let peer_config = PeerConfigBuilder::new(&peer.config.public_key).set_endpoint(new_endpoint);
     let update = DeviceUpdate::new().add_peers(&[peer_config]);
-    update.apply(iface, Backend::default()).unwrap();
+    update.apply(iface, Backend::default())?;
+
+    Ok(())
 }
