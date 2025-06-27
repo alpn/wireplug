@@ -49,12 +49,12 @@ impl WireplugAnnounce {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
-    pub ip: Option<SocketAddr>,
+    pub peer_endpoint: Option<SocketAddr>,
 }
 
 impl WireplugResponse {
-    pub fn new(ip: Option<SocketAddr>) -> Self {
-        WireplugResponse { ip: ip }
+    pub fn new(endpoint: Option<SocketAddr>) -> Self {
+        WireplugResponse { peer_endpoint: endpoint }
     }
 }
 

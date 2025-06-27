@@ -75,10 +75,10 @@ pub(crate) fn monitor_interface(if_name: &String) -> Result<(), std::io::Error> 
         }
         if annouce {
             print!("sending announcement.. ");
-            match send_announcement(&pubkey, &peer.config.public_key, port)?.ip {
-                Some(ip) => {
-                    println!("| wireplug.org: peer is @{}", ip);
-                    wg_interface::update(&iface, &peer, ip)?;
+            match send_announcement(&pubkey, &peer.config.public_key, port)?.peer_endpoint {
+                Some(endpoint) => {
+                    println!("| wireplug.org: peer is @{}", endpoint);
+                    wg_interface::update(&iface, &peer, endpoint)?;
                 }
                 None => println!("| wireplug.org: peer is unknown"),
             }
