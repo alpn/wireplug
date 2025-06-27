@@ -112,9 +112,9 @@ async fn main() -> std::io::Result<()> {
         loop {
             async {
                 let now = SystemTime::now();
-                s.write().await.retain(|_, r| {
-                    if let Ok(duration_since_last_handshake) = now.duration_since(r.timestamp) {
-                        if duration_since_last_handshake < Duration::from_secs(RECORD_TIMEOUT_SEC) {
+                s.write().await.retain(|_, record| {
+                    if let Ok(record_duration) = now.duration_since(record.timestamp) {
+                        if record_duration < Duration::from_secs(RECORD_TIMEOUT_SEC) {
                             return true;
                         }
                     }
