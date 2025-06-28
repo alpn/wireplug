@@ -1,10 +1,14 @@
+use rand::Rng;
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
-use std::net::SocketAddr;
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+};
 
 use ipnet::IpNet;
 use wireguard_control::{
-    Backend, Device, DeviceUpdate, InterfaceName, PeerConfigBuilder, PeerInfo,
+    Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
 use crate::config;
@@ -94,7 +98,9 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
             io::ErrorKind::Other,
             format!(
                 "failed to add route for device {} ({}): {}",
-                &interface, interface.to_string(), stderr
+                &interface,
+                interface.to_string(),
+                stderr
             ),
         ))
     } else {
@@ -102,20 +108,48 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
-pub(crate) fn configure(ifname: &String) -> Result<(), std::io::Error> {
+pub(crate) fn configure(ifname: &String, config_path: &String) -> Result<(), std::io::Error> {
     println!("configuring interface {}..", ifname);
     let ifname: InterfaceName = ifname.parse()?;
-    let update = config::create_interface_config();
-    update.apply(&ifname, Backend::default())?;
+    let config = config::read_from_file(config_path)?;
 
-    let addr = config::get_addr();
+    let mut peers = vec![];
+    for peer in &config.peers {
+        let peer_config =
+            PeerConfigBuilder::new(&Key::from_base64(&peer.public_key).map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Could not parse key: {e}"),
+                )
+            })?)
+            .set_persistent_keepalive_interval(shared::COMMON_PKA)
+            .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str()).unwrap(), 32);
+        peers.push(peer_config);
+    }
+
+    let mut rng = rand::rng();
+    let listen_port: u16 = rng.random_range(1024..=u16::MAX);
+    let update = DeviceUpdate::new()
+        .set_keypair(KeyPair::from_private(
+            Key::from_base64(&config.interface.private_key).unwrap(),
+        ))
+        .set_listen_port(listen_port)
+        .add_peers(&peers);
+    update.apply(&ifname, Backend::default())?;
+    let addr = IpNet::from_str(config.interface.address.as_str()).map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("Parsing Error: {e}"))
+    })?;
     set_addr(&ifname, addr)?;
     add_route(&ifname, addr)?;
 
     Ok(())
 }
 
-pub(crate) fn update(iface: &InterfaceName, peer: &PeerInfo, new_endpoint: SocketAddr) -> Result<(), std::io::Error> {
+pub(crate) fn update(
+    iface: &InterfaceName,
+    peer: &PeerInfo,
+    new_endpoint: SocketAddr,
+) -> Result<(), std::io::Error> {
     println!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),

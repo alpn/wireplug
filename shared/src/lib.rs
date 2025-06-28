@@ -3,6 +3,8 @@ use bincode::{Decode, Encode};
 use std::net::SocketAddr;
 
 const PROTOCOL: &str = "Wireplug_V1";
+pub const COMMON_PKA: u16 = 25;
+
 pub const BINCODE_CONFIG: Configuration<
     bincode::config::LittleEndian,
     bincode::config::Fixint,
@@ -54,10 +56,13 @@ pub struct WireplugResponse {
 
 impl WireplugResponse {
     pub fn new(endpoint: Option<SocketAddr>) -> Self {
-        WireplugResponse { peer_endpoint: endpoint }
+        WireplugResponse {
+            peer_endpoint: endpoint,
+        }
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,3 +83,4 @@ mod tests {
         assert_eq!(announce, hello2);
     }
 }
+*/

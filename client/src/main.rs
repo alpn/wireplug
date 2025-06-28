@@ -10,16 +10,16 @@ pub mod wg_interface;
 struct Cli {
     interface_name: String,
     #[arg(short, long)]
-    config_interface: bool,
+    config: Option<String>,
 }
 
-fn main() -> Result<(), std::io::Error>{
+fn main() -> Result<(), std::io::Error> {
     let cli = Cli::parse();
     let ifname = &cli.interface_name;
     wg_interface::show_config(ifname)?;
 
-    if cli.config_interface {
-        wg_interface::configure(ifname)?;
+    if let Some(config_file) = cli.config {
+        wg_interface::configure(ifname, &config_file)?;
         wg_interface::show_config(ifname)?;
     }
 
