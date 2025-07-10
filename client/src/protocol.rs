@@ -1,10 +1,17 @@
-use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
+use rand::Rng;
+use shared::{
+    BINCODE_CONFIG, UdpTestResult, WireplugAnnounce, WireplugResponse, WireplugTestUdp,
+    WireplugTestUdpResponse,
+};
 use std::{
-    io::{Read, Write},
-    net::TcpStream,
+    fmt::format,
+    io::{Error, Read, Write},
+    net::{SocketAddr, TcpStream, UdpSocket},
+    str::FromStr,
+    thread::sleep,
     time::{Duration, SystemTime},
 };
-use wireguard_control::{Backend, Device, Key};
+use wireguard_control::{Backend, Device, InterfaceName, Key, PeerInfo};
 
 use crate::wg_interface;
 const WIREPLUG_ORG: &str = "wireplug.org:4455";
@@ -41,65 +48,60 @@ fn send_announcement(
     Ok(response)
 }
 
-pub(crate) fn monitor_interface(if_name: &String) -> Result<(), std::io::Error> {
+pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
-    let Some(pubkey) = &device.public_key.clone() else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("{} is not configured", if_name),
-        ));
-    };
-
-    let Some(port) = device.listen_port else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("{} is not configured", if_name),
-        ));
-    };
     let now = SystemTime::now();
 
+    let mut inactive_peers = vec![];
     for peer in device.peers {
         print!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
-        let annouce;
         if let Some(last_handshake) = peer.stats.last_handshake_time {
             let duration = now
                 .duration_since(last_handshake)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
 
-
-            annouce = duration > Duration::from_secs(LAST_HANDSHAKE_MAX);
-        } else {
-            print!("no previous handshakes => ");
-            annouce = true;
-        }
-        if annouce {
-            print!("sending announcement.. ");
-            match send_announcement(&pubkey, &peer.config.public_key, port)?.peer_endpoint {
-                Some(endpoint) => {
-                    println!("| wireplug.org: peer is @{}", endpoint);
-                    wg_interface::update(&iface, &peer, endpoint)?;
-                }
-                None => println!("| wireplug.org: peer is unknown"),
+            if duration > Duration::from_secs(LAST_HANDSHAKE_MAX) {
+                inactive_peers.push(peer.config.public_key);
+                println!("INACTIVE");
+            } else {
+                println!("OK");
             }
         } else {
-            println!("doing nothing");
+            inactive_peers.push(peer.config.public_key);
+            println!("INACTIVE");
+        }
+    }
+    Ok(inactive_peers)
+}
+
+pub(crate) fn announce_and_update_peers(
+    if_name: &String,
+    peers: Vec<Key>,
+    announcement_port: u16,
+) -> Result<(), std::io::Error> {
+    let iface = if_name.parse()?;
+    let device = Device::get(&iface, Backend::default())?;
+    let Some(initiator_pubkey) = &device.public_key.clone() else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("{} is not configured", if_name),
+        ));
+    };
+
+    for peer in peers {
+        print!(
+            "announcing ourselves to {} .. ",
+            &peer.get_public().to_base64()
+        );
+        let announcement_response = send_announcement(&initiator_pubkey, &peer, announcement_port)?;
+        match announcement_response.peer_endpoint {
+            Some(endpoint) => {
+                println!("| wireplug.org: peer is @{}", endpoint);
+                wg_interface::update_peer(&iface, &peer, endpoint)?;
+            }
+            None => println!("| wireplug.org: peer is unknown"),
         }
     }
     Ok(())
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_nothing() {
-        let alice = Key::from_base64("5SpMF4Wozu4e2lapOq7frNaJBNyTuW4kwfBEDicgrxs=").unwrap();
-        let bob = Key::from_base64("lCN7vqk1TlzncMwLmJJKMCtDICUChxc2JnI/QtXKm38=").unwrap();
-        println!("announcing {:?} - {:?}", alice, bob);
-        let res = send_announcement(&bob, &alice).unwrap();
-        println!("res= {:?}", res);
-    }
-}
-*/
