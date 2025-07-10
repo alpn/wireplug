@@ -1,7 +1,7 @@
 use rand::Rng;
 use shared::{
-    BINCODE_CONFIG, UdpTestResult, WireplugAnnounce, WireplugResponse, WireplugTestUdp,
-    WireplugTestUdpResponse,
+    BINCODE_CONFIG, WireplugStunResult, WireplugAnnounce, WireplugResponse, WireplugStunRequest,
+    WireplugStunResponse,
 };
 use std::{
     fmt::format,

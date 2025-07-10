@@ -24,6 +24,7 @@ fn is_valid_wgkey(s: &String) -> bool {
     }
     true
 }
+
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugAnnounce {
     proto: String,
@@ -59,6 +60,42 @@ impl WireplugResponse {
         WireplugResponse {
             peer_endpoint: endpoint,
         }
+    }
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+pub struct WireplugStunRequest {
+    proto: String,
+    pub port: u16,
+}
+
+impl WireplugStunRequest {
+    pub fn new(port: u16) -> Self {
+        WireplugStunRequest {
+            proto: String::from(PROTOCOL),
+            port: port,
+        }
+    }
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+pub enum WireplugStunResult {
+    SamePort,
+    DifferentPort(u16),
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+pub struct WireplugStunResponse {
+    pub result: WireplugStunResult,
+}
+
+impl WireplugStunResponse {
+    pub fn new(port: Option<u16>) -> Self {
+        let res = match port {
+            Some(p) => WireplugStunResult::DifferentPort(p),
+            None => WireplugStunResult::SamePort,
+        };
+        WireplugStunResponse { result: res }
     }
 }
 
