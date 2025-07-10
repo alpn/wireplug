@@ -11,7 +11,10 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::{config::{self, Config}, utils};
+use crate::{
+    config::{self, Config},
+    utils,
+};
 
 pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     println!("=========== if: {ifname} ===========");
@@ -128,7 +131,7 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
 
     let listen_port = match config.interface.listen_port {
         Some(port) => port,
-        None => utils::get_random_port()
+        None => utils::get_random_port(),
     };
 
     let update = DeviceUpdate::new()
@@ -165,4 +168,17 @@ pub(crate) fn update_peer(
     update.apply(iface, Backend::default())?;
 
     Ok(())
+}
+
+pub(crate) fn update_port(ifname: &String, new_port: u16) -> Result<(), std::io::Error> {
+    let iface: InterfaceName = ifname.parse()?;
+    let update = DeviceUpdate::new().set_listen_port(new_port);
+    update.apply(&iface, Backend::default())?;
+    Ok(())
+}
+
+pub(crate) fn get_port(ifname: &String) -> Option<u16> {
+    let ifname: InterfaceName = ifname.parse().ok()?;
+    let dev = Device::get(&ifname, Backend::default()).ok()?;
+    dev.listen_port
 }
