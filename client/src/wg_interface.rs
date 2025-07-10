@@ -148,19 +148,19 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
     Ok(())
 }
 
-pub(crate) fn update(
+pub(crate) fn update_peer(
     iface: &InterfaceName,
-    peer: &PeerInfo,
+    peer: &Key,
     new_endpoint: SocketAddr,
 ) -> Result<(), std::io::Error> {
     println!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),
-        peer.config.public_key.to_base64(),
+        peer.to_base64(),
         new_endpoint.to_string(),
     );
 
-    let peer_config = PeerConfigBuilder::new(&peer.config.public_key).set_endpoint(new_endpoint);
+    let peer_config = PeerConfigBuilder::new(&peer).set_endpoint(new_endpoint);
     let update = DeviceUpdate::new().add_peers(&[peer_config]);
     update.apply(iface, Backend::default())?;
 
