@@ -11,7 +11,7 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::config;
+use crate::{config::{self, Config}, utils};
 
 pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     println!("=========== if: {ifname} ===========");
@@ -108,10 +108,9 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
-pub(crate) fn configure(ifname: &String, config_path: &String) -> Result<(), std::io::Error> {
+pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io::Error> {
     println!("configuring interface {}..", ifname);
     let ifname: InterfaceName = ifname.parse()?;
-    let config = config::read_from_file(config_path)?;
 
     let mut peers = vec![];
     for peer in &config.peers {
@@ -127,8 +126,11 @@ pub(crate) fn configure(ifname: &String, config_path: &String) -> Result<(), std
         peers.push(peer_config);
     }
 
-    let mut rng = rand::rng();
-    let listen_port: u16 = rng.random_range(1024..=u16::MAX);
+    let listen_port = match config.interface.listen_port {
+        Some(port) => port,
+        None => utils::get_random_port()
+    };
+
     let update = DeviceUpdate::new()
         .set_keypair(KeyPair::from_private(
             Key::from_base64(&config.interface.private_key).unwrap(),

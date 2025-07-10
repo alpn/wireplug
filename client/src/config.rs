@@ -14,6 +14,7 @@ pub(crate) struct Config {
 pub(crate) struct Interface {
     pub address: String,
     pub private_key: String,
+    pub listen_port: Option<u16>
 }
 
 #[derive(Deserialize, Debug)]
