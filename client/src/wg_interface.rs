@@ -140,6 +140,7 @@ pub(crate) fn configure(ifname: &String, config_path: &String) -> Result<(), std
         std::io::Error::new(std::io::ErrorKind::Other, format!("Parsing Error: {e}"))
     })?;
     set_addr(&ifname, addr)?;
+    #[cfg(target_os = "macos")]
     add_route(&ifname, addr)?;
 
     Ok(())
