@@ -1,17 +1,12 @@
-use rand::Rng;
 use shared::{
-    BINCODE_CONFIG, WireplugAnnounce, WireplugResponse, WireplugStunRequest, WireplugStunResponse,
-    WireplugStunResult,
+    BINCODE_CONFIG, WireplugAnnounce, WireplugResponse,
 };
 use std::{
-    fmt::format,
-    io::{Error, Read, Write},
-    net::{SocketAddr, TcpStream, UdpSocket},
-    str::FromStr,
-    thread::sleep,
+    io::{Read, Write},
+    net::TcpStream,
     time::{Duration, SystemTime},
 };
-use wireguard_control::{Backend, Device, InterfaceName, Key, PeerInfo};
+use wireguard_control::{Backend, Device, Key};
 
 use crate::wg_interface;
 const WIREPLUG_ORG: &str = "wireplug.org:4455";
@@ -34,15 +29,15 @@ fn send_announcement(
     );
 
     let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::Other, format!("encoding error: {e}"))
+        std::io::Error::other(format!("encoding error: {e}"))
     })?;
 
     stream.write_all(&buf)?;
     let mut res = [0u8; 1024];
-    stream.read(&mut res)?;
+    let _ = stream.read(&mut res)?;
     let (response, _): (WireplugResponse, usize) =
         bincode::decode_from_slice(&res[..], BINCODE_CONFIG).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, format!("encoding error: {e}"))
+            std::io::Error::other(format!("encoding error: {e}"))
         })?;
 
     Ok(response)
@@ -59,7 +54,7 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
         if let Some(last_handshake) = peer.stats.last_handshake_time {
             let duration = now
                 .duration_since(last_handshake)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{e}")))?;
+                .map_err(|e| std::io::Error::other(format!("{e}")))?;
 
             if duration > Duration::from_secs(LAST_HANDSHAKE_MAX) {
                 inactive_peers.push(peer.config.public_key);
@@ -83,9 +78,8 @@ pub(crate) fn announce_and_update_peers(
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     let Some(initiator_pubkey) = &device.public_key.clone() else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("{} is not configured", if_name),
+        return Err(std::io::Error::other(
+            format!("{if_name} is not configured"),
         ));
     };
 
@@ -94,10 +88,10 @@ pub(crate) fn announce_and_update_peers(
             "announcing ourselves to {} .. ",
             &peer.get_public().to_base64()
         );
-        let announcement_response = send_announcement(&initiator_pubkey, &peer, announcement_port)?;
+        let announcement_response = send_announcement(initiator_pubkey, &peer, announcement_port)?;
         match announcement_response.peer_endpoint {
             Some(endpoint) => {
-                println!("| wireplug.org: peer is @{}", endpoint);
+                println!("| wireplug.org: peer is @{endpoint}");
                 wg_interface::update_peer(&iface, &peer, endpoint)?;
             }
             None => println!("| wireplug.org: peer is unknown"),

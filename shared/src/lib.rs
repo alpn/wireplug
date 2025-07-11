@@ -73,7 +73,7 @@ impl WireplugStunRequest {
     pub fn new(port: u16) -> Self {
         WireplugStunRequest {
             proto: String::from(PROTOCOL),
-            port: port,
+            port,
         }
     }
 }

@@ -27,8 +27,7 @@ pub(crate) struct Peer {
 pub(crate) fn read_from_file(path: &String) -> io::Result<Config> {
     let config = std::fs::read_to_string(path)?;
     toml::from_str(&config).map_err(|e| {
-        Error::new(
-            io::ErrorKind::Other,
+        Error::other(
             format!("Config file parsing error: {e}"),
         )
     })

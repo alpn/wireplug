@@ -1,6 +1,5 @@
 use chrono::Utc;
 use std::collections::HashMap;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -29,9 +28,8 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
     stream.read(&mut buffer).await?;
     let (announcement, _): (WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG).map_err(|e| {
-            std::io::Error::new(
-                ErrorKind::Other,
-                format!("decoding error: {}", e.to_string()),
+            std::io::Error::other(
+                format!("decoding error: {e}"),
             )
         })?;
 
@@ -53,20 +51,15 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
         },
     );
 
-    let peer_endpoint = match storage
+    let peer_endpoint = storage
         .read()
         .await
         .get(&(announcement.peer_pubkey, announcement.initiator_pubkey))
-        .copied()
-    {
-        Some(record) => Some(record.endpoint),
-        None => None,
-    };
+        .copied().map(|record| record.endpoint);
     let response = WireplugResponse::new(peer_endpoint);
     let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG).map_err(|e| {
-        std::io::Error::new(
-            ErrorKind::Other,
-            format!("encoding error: {}", e.to_string()),
+        std::io::Error::other(
+            format!("encoding error: {e}"),
         )
     })?;
     stream.write_all(&buffer).await?;
@@ -84,7 +77,7 @@ async fn status(storage: &Storage) {
         let ip = p.1.endpoint;
         let timestamp = &p.1.timestamp;
         let datetime: chrono::DateTime<Utc> = (*timestamp).into();
-        println!("\t{peer_a} @{ip} -> {peer_b} | {}", datetime);
+        println!("\t{peer_a} @{ip} -> {peer_b} | {datetime}");
     }
 }
 

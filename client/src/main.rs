@@ -41,7 +41,7 @@ fn main() -> Result<(), std::io::Error> {
             let port_to_announce = if !cli.no_nat {
                 let new_listen_port = utils::get_random_port();
                 let nat = nat::detect_kind(new_listen_port)?;
-                println!("NAT: {:?}", nat);
+                println!("NAT: {nat:?}");
                 let observed_port = match nat {
                     nat::NatKind::Easy => new_listen_port,
                     nat::NatKind::Manageable(port_mapping_nat) => port_mapping_nat.obsereved_port,
@@ -53,7 +53,7 @@ fn main() -> Result<(), std::io::Error> {
                 };
                 println!("updating port..");
                 std::thread::sleep(Duration::from_secs(3));
-                wg_interface::update_port(&ifname, new_listen_port)?;
+                wg_interface::update_port(ifname, new_listen_port)?;
                 observed_port
             } else {
                 listen_port
