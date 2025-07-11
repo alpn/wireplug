@@ -5,13 +5,17 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
+use shared::{
+    BINCODE_CONFIG, WireplugAnnounce, WireplugResponse
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 #[cfg(target_os = "openbsd")]
 use openbsd::pledge;
+
+pub mod stun;
 
 #[derive(Clone, Copy)]
 struct Record {
@@ -35,7 +39,6 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
 
     let announcer_ip = stream.peer_addr()?;
     if !announcement.valid() {
-        //println!("got bs from {}", ip.to_string());
         stream.shutdown().await?;
         return Ok(());
     }
@@ -86,6 +89,7 @@ async fn status(storage: &Storage) {
         println!("\t{peer_a} @{ip} -> {peer_b} | {}", datetime);
     }
 }
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     #[cfg(target_os = "openbsd")]
@@ -98,12 +102,16 @@ async fn main() -> std::io::Result<()> {
 
     let listener = TcpListener::bind("0.0.0.0:4455").await?;
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
+    let arc_mutex = Arc::new(Mutex::new(()));
 
     let s = Arc::clone(&storage);
+    let mtx = Arc::clone(&arc_mutex);
+
     tokio::spawn(async move {
         loop {
+            let _guard = mtx.lock().await;
             status(&s).await;
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
         }
     });
 
@@ -124,6 +132,18 @@ async fn main() -> std::io::Result<()> {
             .await;
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
+    });
+
+    let mtx = Arc::clone(&arc_mutex);
+    tokio::spawn(async move {
+        let stun1 = shared::WIREPLUG_ORG_STUN1.to_string();
+        stun::start_serving(stun1, mtx).await;
+    });
+
+    let mtx = Arc::clone(&arc_mutex);
+    tokio::spawn(async move {
+        let stun2 = shared::WIREPLUG_ORG_STUN2.to_string();
+        stun::start_serving(stun2, mtx).await;
     });
 
     loop {
