@@ -21,4 +21,6 @@ target/
 #.idea/
 
 to_blk.sh
+to_xblk.sh
+to_alp.sh
 wg0.conf
