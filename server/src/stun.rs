@@ -1,0 +1,59 @@
+use std::{sync::Arc, time::Duration};
+
+use shared::{BINCODE_CONFIG, WireplugStunRequest, WireplugStunResponse};
+use tokio::{net::UdpSocket, sync::Mutex};
+
+pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
+    let socket = match UdpSocket::bind(bind_to).await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{e}");
+            return;
+        }
+    };
+    let socket = Arc::new(socket);
+    let mut buf = [0u8; 1024];
+    loop {
+        let addr = match socket.recv_from(&mut buf).await {
+            Ok((_, addr)) => addr,
+            Err(e) => {
+                eprintln!("{e}");
+                continue;
+            }
+        };
+        println!("udp test from addr: {:?}", &addr);
+        let observed_port = addr.port();
+        let socket = Arc::clone(&socket);
+        let mtx = Arc::clone(&mtx);
+        tokio::spawn(async move {
+            let udp_test_request: WireplugStunRequest =
+                match bincode::decode_from_slice(&buf[..], BINCODE_CONFIG) {
+                    Ok((req, _)) => req,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        return;
+                    }
+                };
+
+            let _guard = mtx.lock().await;
+            println!("stated port: {}", udp_test_request.port);
+            println!("observed port: {observed_port}");
+            let udp_test_response = match observed_port == udp_test_request.port {
+                true => WireplugStunResponse::new(None),
+                false => WireplugStunResponse::new(Some(observed_port)),
+            };
+
+            let data = match bincode::encode_to_vec(udp_test_response, BINCODE_CONFIG) {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("{e}");
+                    return;
+                }
+            };
+            let _ = socket.send_to(&data, addr).await.map_err(|e| {
+                eprintln!("{e}");
+            });
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        });
+    }
+}
