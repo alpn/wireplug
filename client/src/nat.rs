@@ -1,7 +1,5 @@
-use shared::{WireplugStunRequest, WireplugStunResponse, WireplugStunResult, BINCODE_CONFIG};
-use std::{
-    net::{SocketAddr, UdpSocket},
-};
+use shared::{BINCODE_CONFIG, WireplugStunRequest, WireplugStunResponse, WireplugStunResult};
+use std::net::{SocketAddr, UdpSocket};
 
 #[derive(Debug)]
 pub(crate) struct PortMappingNat {
@@ -25,7 +23,10 @@ pub(crate) enum NatKind {
     Hard,
 }
 
-fn send_stun_request(dst: SocketAddr, local_port: u16) -> Result<WireplugStunResponse, std::io::Error> {
+fn send_stun_request(
+    dst: SocketAddr,
+    local_port: u16,
+) -> Result<WireplugStunResponse, std::io::Error> {
     let request = WireplugStunRequest::new(local_port);
     let buf = bincode::encode_to_vec(&request, BINCODE_CONFIG).map_err(|e| {
         std::io::Error::new(std::io::ErrorKind::Other, format!("encoding error: {e}"))
@@ -53,7 +54,10 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
         .parse()
         .map_err(|e| std::io::Error::other(format!("{e}")))?;
 
-    let nat = match (send_stun_request(stun1, local_port)?.result, send_stun_request(stun2, local_port)?.result) {
+    let nat = match (
+        send_stun_request(stun1, local_port)?.result,
+        send_stun_request(stun2, local_port)?.result,
+    ) {
         (WireplugStunResult::SamePort, WireplugStunResult::SamePort) => NatKind::Easy,
         (WireplugStunResult::DifferentPort(port1), WireplugStunResult::DifferentPort(port2)) => {
             if port1 == port2 {

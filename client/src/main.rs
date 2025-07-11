@@ -33,7 +33,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     loop {
-        let Some(listen_port ) = wg_interface::get_port(ifname) else {
+        let Some(listen_port) = wg_interface::get_port(ifname) else {
             todo!();
         };
         let inactive_peers = protocol::get_inactive_peers(ifname)?;
