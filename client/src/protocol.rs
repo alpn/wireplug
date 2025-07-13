@@ -56,7 +56,11 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
                 .duration_since(last_handshake)
                 .map_err(|e| std::io::Error::other(format!("{e}")))?;
 
-            if duration > Duration::from_secs(LAST_HANDSHAKE_MAX) {
+            if duration > Duration::from_secs(std::cmp::max(
+                    peer.config.persistent_keepalive_interval.unwrap_or(0) as u64,
+                    LAST_HANDSHAKE_MAX,
+                ))
+            {
                 inactive_peers.push(peer.config.public_key);
                 println!("INACTIVE");
             } else {
