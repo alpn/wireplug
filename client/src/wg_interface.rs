@@ -10,10 +10,7 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder,
 };
 
-use crate::{
-    config::Config,
-    utils,
-};
+use crate::{config::Config, utils};
 
 pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     println!("=========== if: {ifname} ===========");
@@ -48,14 +45,12 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
     if output.status.success() {
         Ok(output)
     } else {
-        Err(io::Error::other(
-            format!(
-                "failed to run {} {} command: {}",
-                bin,
-                args.join(" "),
-                String::from_utf8_lossy(&output.stderr)
-            ),
-        ))
+        Err(io::Error::other(format!(
+            "failed to run {} {} command: {}",
+            bin,
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        )))
     }
 }
 pub fn set_addr(
@@ -95,14 +90,10 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     )?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
-        Err(io::Error::other(
-            format!(
-                "failed to add route for device {} ({}): {}",
-                &interface,
-                interface,
-                stderr
-            ),
-        ))
+        Err(io::Error::other(format!(
+            "failed to add route for device {} ({}): {}",
+            &interface, interface, stderr
+        )))
     } else {
         Ok(!stderr.contains("File exists"))
     }
@@ -114,14 +105,12 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
 
     let mut peers = vec![];
     for peer in &config.peers {
-        let peer_config =
-            PeerConfigBuilder::new(&Key::from_base64(&peer.public_key).map_err(|e| {
-                std::io::Error::other(
-                    format!("Could not parse key: {e}"),
-                )
-            })?)
-            .set_persistent_keepalive_interval(shared::COMMON_PKA)
-            .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str()).unwrap(), 32);
+        let peer_config = PeerConfigBuilder::new(
+            &Key::from_base64(&peer.public_key)
+                .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
+        )
+        .set_persistent_keepalive_interval(shared::COMMON_PKA)
+        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str()).unwrap(), 32);
         peers.push(peer_config);
     }
 
@@ -137,9 +126,8 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
         .set_listen_port(listen_port)
         .add_peers(&peers);
     update.apply(&ifname, Backend::default())?;
-    let addr = IpNet::from_str(config.interface.address.as_str()).map_err(|e| {
-        std::io::Error::other(format!("Parsing Error: {e}"))
-    })?;
+    let addr = IpNet::from_str(config.interface.address.as_str())
+        .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
     set_addr(&ifname, addr)?;
     #[cfg(target_os = "macos")]
     add_route(&ifname, addr)?;

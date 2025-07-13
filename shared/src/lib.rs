@@ -2,7 +2,7 @@ use bincode::config::Configuration;
 use bincode::{Decode, Encode};
 use std::net::SocketAddr;
 
-const PROTOCOL: &str = "Wireplug_V1";
+const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
 pub const COMMON_PKA: u16 = 25;
 
 pub const BINCODE_CONFIG: Configuration<
@@ -31,19 +31,26 @@ pub struct WireplugAnnounce {
     pub initiator_pubkey: String,
     pub peer_pubkey: String,
     pub listen_port: u16,
+    pub lan_addrs: Option<Vec<String>>,
 }
 
 impl WireplugAnnounce {
-    pub fn new(initiator_pubkey: &String, peer_pubkey: &String, port: u16) -> Self {
+    pub fn new(
+        initiator_pubkey: &String,
+        peer_pubkey: &String,
+        listen_port: u16,
+        lan_addrs: Option<Vec<String>>,
+    ) -> Self {
         WireplugAnnounce {
-            proto: String::from(PROTOCOL),
+            proto: String::from(WIREPLUG_PROTOCOL_VERSION),
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkey: peer_pubkey.to_owned(),
-            listen_port: port,
+            listen_port,
+            lan_addrs,
         }
     }
     pub fn valid(&self) -> bool {
-        self.proto.eq(PROTOCOL)
+        self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
             && is_valid_wgkey(&self.initiator_pubkey)
             && is_valid_wgkey(&self.peer_pubkey)
             && self.listen_port >= 1024
@@ -51,15 +58,45 @@ impl WireplugAnnounce {
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
+pub enum WireplugEndpoint {
+    Unknown,
+    LocalNetwork {
+        lan_addrs: Vec<String>,
+        listen_port: u16,
+    },
+    RemoteNetwork(SocketAddr),
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
-    pub peer_endpoint: Option<SocketAddr>,
+    proto: String,
+    pub peer_endpoint: WireplugEndpoint,
 }
 
 impl WireplugResponse {
-    pub fn new(endpoint: Option<SocketAddr>) -> Self {
+    pub fn new() -> Self {
         WireplugResponse {
-            peer_endpoint: endpoint,
+            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
+            peer_endpoint: WireplugEndpoint::Unknown,
         }
+    }
+    pub fn from_sockaddr(endpoint: SocketAddr) -> Self {
+        WireplugResponse {
+            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
+            peer_endpoint: WireplugEndpoint::RemoteNetwork(endpoint),
+        }
+    }
+    pub fn from_lan_addrs(lan_addrs: Vec<String>, listen_port: u16) -> Self {
+        WireplugResponse {
+            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
+            peer_endpoint: WireplugEndpoint::LocalNetwork {
+                lan_addrs,
+                listen_port,
+            },
+        }
+    }
+    pub fn valid(&self) -> bool {
+        self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
     }
 }
 
@@ -72,7 +109,7 @@ pub struct WireplugStunRequest {
 impl WireplugStunRequest {
     pub fn new(port: u16) -> Self {
         WireplugStunRequest {
-            proto: String::from(PROTOCOL),
+            proto: String::from(WIREPLUG_PROTOCOL_VERSION),
             port,
         }
     }

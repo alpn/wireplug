@@ -28,9 +28,8 @@ fn send_stun_request(
     local_port: u16,
 ) -> Result<WireplugStunResponse, std::io::Error> {
     let request = WireplugStunRequest::new(local_port);
-    let buf = bincode::encode_to_vec(&request, BINCODE_CONFIG).map_err(|e| {
-        std::io::Error::other(format!("encoding error: {e}"))
-    })?;
+    let buf = bincode::encode_to_vec(&request, BINCODE_CONFIG)
+        .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{local_port}"))?;
     let _ = socket.send_to(&buf, dst)?;
@@ -38,9 +37,8 @@ fn send_stun_request(
     let mut res = [0u8; 1024];
     let _ = socket.recv(&mut res)?;
     let (response, _): (WireplugStunResponse, usize) =
-        bincode::decode_from_slice(&res[..], BINCODE_CONFIG).map_err(|e| {
-            std::io::Error::other(format!("encoding error: {e}"))
-        })?;
+        bincode::decode_from_slice(&res[..], BINCODE_CONFIG)
+            .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     Ok(response)
 }

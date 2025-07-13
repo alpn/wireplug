@@ -14,9 +14,10 @@ use openbsd::pledge;
 
 pub mod stun;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Record {
-    pub endpoint: SocketAddr,
+    pub wan_addr: SocketAddr,
+    pub lan_addrs: Option<Vec<String>>,
     pub timestamp: SystemTime,
 }
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
@@ -27,11 +28,8 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
     let mut buffer = [0u8; 1024];
     stream.read(&mut buffer).await?;
     let (announcement, _): (WireplugAnnounce, usize) =
-        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG).map_err(|e| {
-            std::io::Error::other(
-                format!("decoding error: {e}"),
-            )
-        })?;
+        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)
+            .map_err(|e| std::io::Error::other(format!("decoding error: {e}")))?;
 
     let announcer_ip = stream.peer_addr()?;
     if !announcement.valid() {
@@ -46,22 +44,33 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
             announcement.peer_pubkey.to_owned(),
         ),
         Record {
-            endpoint: addr,
+            wan_addr: addr,
+            lan_addrs: announcement.lan_addrs,
             timestamp: SystemTime::now(),
         },
     );
 
-    let peer_endpoint = storage
+    let response = match storage
         .read()
         .await
         .get(&(announcement.peer_pubkey, announcement.initiator_pubkey))
-        .copied().map(|record| record.endpoint);
-    let response = WireplugResponse::new(peer_endpoint);
-    let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG).map_err(|e| {
-        std::io::Error::other(
-            format!("encoding error: {e}"),
-        )
-    })?;
+        .cloned()
+    {
+        Some(record) => {
+            if announcer_ip.ip() == record.wan_addr.ip() {
+                WireplugResponse::from_lan_addrs(
+                    record.lan_addrs.map_or(vec![], |v| v),
+                    record.wan_addr.port(),
+                )
+            } else {
+                WireplugResponse::from_sockaddr(record.wan_addr)
+            }
+        }
+        None => WireplugResponse::new(),
+    };
+
+    let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG)
+        .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
     stream.write_all(&buffer).await?;
     stream.shutdown().await?;
 
@@ -74,7 +83,7 @@ async fn status(storage: &Storage) {
     for p in storage.read().await.iter() {
         let peer_a = &p.0.0;
         let peer_b = &p.0.1;
-        let ip = p.1.endpoint;
+        let ip = p.1.wan_addr;
         let timestamp = &p.1.timestamp;
         let datetime: chrono::DateTime<Utc> = (*timestamp).into();
         println!("\t{peer_a} @{ip} -> {peer_b} | {datetime}");

@@ -246,6 +246,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "clap",
+ "getifaddrs",
  "ipnet",
  "rand",
  "serde",
@@ -312,6 +313,17 @@ name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+
+[[package]]
+name = "getifaddrs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c016cebf305060d144de015c98191ede05c210af588857bc2d4f8611c04663"
+dependencies = [
+ "bitflags 2.9.1",
+ "libc",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "getrandom"

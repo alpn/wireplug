@@ -38,6 +38,7 @@ fn main() -> Result<(), std::io::Error> {
         };
         let inactive_peers = protocol::get_inactive_peers(ifname)?;
         if !inactive_peers.is_empty() {
+            let lan_addrs = utils::get_lan_addrs(ifname).ok();
             let port_to_announce = if !cli.no_nat {
                 let new_listen_port = utils::get_random_port();
                 let nat = nat::detect_kind(new_listen_port)?;
@@ -58,7 +59,12 @@ fn main() -> Result<(), std::io::Error> {
             } else {
                 listen_port
             };
-            protocol::announce_and_update_peers(ifname, inactive_peers, port_to_announce)?;
+            protocol::announce_and_update_peers(
+                ifname,
+                inactive_peers,
+                port_to_announce,
+                lan_addrs,
+            )?;
         }
         thread::sleep(Duration::from_secs(protocol::MONITORING_INTERVAL));
     }
