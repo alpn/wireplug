@@ -95,9 +95,9 @@ pub(crate) fn announce_and_update_peers(
             return Err(std::io::Error::other("invalid response"));
         }
         match response.peer_endpoint {
-            shared::WirePlugEndpoint::Unknown => println!("| wireplug.org: peer is unknown"),
-            shared::WirePlugEndpoint::LocalNetwork {
-                lan_ips: lan_addrs,
+            shared::WireplugEndpoint::Unknown => println!("| wireplug.org: peer is unknown"),
+            shared::WireplugEndpoint::LocalNetwork {
+                lan_addrs,
                 listen_port,
             } => {
                 if let Some(addr) = lan_addrs.get(0) {
@@ -108,7 +108,7 @@ pub(crate) fn announce_and_update_peers(
                     wg_interface::update_peer(&iface, &peer, addr)?;
                 }
             }
-            shared::WirePlugEndpoint::RemoteNetwork(wan_addr) => {
+            shared::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 println!("| wireplug.org: peer is @{wan_addr}");
                 wg_interface::update_peer(&iface, &peer, wan_addr)?;
             }
