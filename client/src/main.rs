@@ -36,7 +36,7 @@ fn main() -> Result<(), std::io::Error> {
         let Some(listen_port) = wg_interface::get_port(ifname) else {
             todo!();
         };
-        let inactive_peers = protocol::get_inactive_peers(ifname)?;
+        let inactive_peers = wg_interface::get_inactive_peers(ifname)?;
         if !inactive_peers.is_empty() {
             let lan_addrs = utils::get_lan_addrs(ifname).ok();
             let port_to_announce = if !cli.no_nat {

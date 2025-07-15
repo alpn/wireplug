@@ -44,37 +44,6 @@ fn send_announcement(
     Ok(response)
 }
 
-pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
-    let iface = if_name.parse()?;
-    let device = Device::get(&iface, Backend::default())?;
-    let now = SystemTime::now();
-
-    let mut inactive_peers = vec![];
-    for peer in device.peers {
-        print!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
-        if let Some(last_handshake) = peer.stats.last_handshake_time {
-            let duration = now
-                .duration_since(last_handshake)
-                .map_err(|e| std::io::Error::other(format!("{e}")))?;
-
-            if duration > Duration::from_secs(std::cmp::max(
-                    peer.config.persistent_keepalive_interval.unwrap_or(0) as u64,
-                    LAST_HANDSHAKE_MAX,
-                ))
-            {
-                inactive_peers.push(peer.config.public_key);
-                println!("INACTIVE");
-            } else {
-                println!("OK");
-            }
-        } else {
-            inactive_peers.push(peer.config.public_key);
-            println!("INACTIVE");
-        }
-    }
-    Ok(inactive_peers)
-}
-
 pub(crate) fn announce_and_update_peers(
     if_name: &String,
     peers: Vec<Key>,
