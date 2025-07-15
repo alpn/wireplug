@@ -7,6 +7,7 @@ use std::{
 };
 
 use ipnet::IpNet;
+use shared::protocol;
 use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder,
 };
@@ -110,7 +111,7 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
             &Key::from_base64(&peer.public_key)
                 .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
         )
-        .set_persistent_keepalive_interval(shared::COMMON_PKA)
+        .set_persistent_keepalive_interval(protocol::COMMON_PKA)
         .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str()).unwrap(), 32);
         peers.push(peer_config);
     }
@@ -184,7 +185,7 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
             if duration
                 > Duration::from_secs(std::cmp::max(
                     peer.config.persistent_keepalive_interval.unwrap_or(0) as u64,
-                    shared::LAST_HANDSHAKE_MAX,
+                    protocol::LAST_HANDSHAKE_MAX,
                 ))
             {
                 inactive_peers.push(peer.config.public_key);

@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
+use shared::{BINCODE_CONFIG, protocol::{self}};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{Mutex, RwLock};
@@ -27,7 +27,7 @@ const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::Result<()> {
     let mut buffer = [0u8; 1024];
     stream.read(&mut buffer).await?;
-    let (announcement, _): (WireplugAnnounce, usize) =
+    let (announcement, _): (protocol::WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)
             .map_err(|e| std::io::Error::other(format!("decoding error: {e}")))?;
 
@@ -58,15 +58,15 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
     {
         Some(record) => {
             if announcer_ip.ip() == record.wan_addr.ip() {
-                WireplugResponse::from_lan_addrs(
+                protocol::WireplugResponse::from_lan_addrs(
                     record.lan_addrs.map_or(vec![], |v| v),
                     record.wan_addr.port(),
                 )
             } else {
-                WireplugResponse::from_sockaddr(record.wan_addr)
+                protocol::WireplugResponse::from_sockaddr(record.wan_addr)
             }
         }
-        None => WireplugResponse::new(),
+        None => protocol::WireplugResponse::new(),
     };
 
     let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG)

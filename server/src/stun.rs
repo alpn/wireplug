@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use shared::{BINCODE_CONFIG, WireplugStunRequest, WireplugStunResponse};
+use shared::{BINCODE_CONFIG, protocol::{self}};
 use tokio::{net::UdpSocket, sync::Mutex};
 
 pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
@@ -26,7 +26,7 @@ pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
         let socket = Arc::clone(&socket);
         let mtx = Arc::clone(&mtx);
         tokio::spawn(async move {
-            let udp_test_request: WireplugStunRequest =
+            let udp_test_request: protocol::WireplugStunRequest =
                 match bincode::decode_from_slice(&buf[..], BINCODE_CONFIG) {
                     Ok((req, _)) => req,
                     Err(e) => {
@@ -39,8 +39,8 @@ pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
             println!("stated port: {}", udp_test_request.port);
             println!("observed port: {observed_port}");
             let udp_test_response = match observed_port == udp_test_request.port {
-                true => WireplugStunResponse::new(None),
-                false => WireplugStunResponse::new(Some(observed_port)),
+                true => protocol::WireplugStunResponse::new(None),
+                false => protocol::WireplugStunResponse::new(Some(observed_port)),
             };
 
             let data = match bincode::encode_to_vec(udp_test_response, BINCODE_CONFIG) {

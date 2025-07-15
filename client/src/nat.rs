@@ -1,4 +1,4 @@
-use shared::{BINCODE_CONFIG, WireplugStunRequest, WireplugStunResponse, WireplugStunResult};
+use shared::{protocol::{self}, BINCODE_CONFIG};
 use std::net::{SocketAddr, UdpSocket};
 
 #[derive(Debug)]
@@ -26,8 +26,8 @@ pub(crate) enum NatKind {
 fn send_stun_request(
     dst: SocketAddr,
     local_port: u16,
-) -> Result<WireplugStunResponse, std::io::Error> {
-    let request = WireplugStunRequest::new(local_port);
+) -> Result<protocol::WireplugStunResponse, std::io::Error> {
+    let request = protocol::WireplugStunRequest::new(local_port);
     let buf = bincode::encode_to_vec(&request, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
@@ -36,7 +36,7 @@ fn send_stun_request(
 
     let mut res = [0u8; 1024];
     let _ = socket.recv(&mut res)?;
-    let (response, _): (WireplugStunResponse, usize) =
+    let (response, _): (protocol::WireplugStunResponse, usize) =
         bincode::decode_from_slice(&res[..], BINCODE_CONFIG)
             .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
@@ -56,8 +56,8 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
         send_stun_request(stun1, local_port)?.result,
         send_stun_request(stun2, local_port)?.result,
     ) {
-        (WireplugStunResult::SamePort, WireplugStunResult::SamePort) => NatKind::Easy,
-        (WireplugStunResult::DifferentPort(port1), WireplugStunResult::DifferentPort(port2)) => {
+        (protocol::WireplugStunResult::SamePort, protocol::WireplugStunResult::SamePort) => NatKind::Easy,
+        (protocol::WireplugStunResult::DifferentPort(port1), protocol::WireplugStunResult::DifferentPort(port2)) => {
             if port1 == port2 {
                 let observed_port = port1;
                 NatKind::Manageable(PortMappingNat::new(local_port, observed_port))
@@ -65,8 +65,8 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
                 NatKind::Hard
             }
         }
-        (WireplugStunResult::SamePort, WireplugStunResult::DifferentPort(_)) => todo!(),
-        (WireplugStunResult::DifferentPort(_), WireplugStunResult::SamePort) => todo!(),
+        (protocol::WireplugStunResult::SamePort, protocol::WireplugStunResult::DifferentPort(_)) => todo!(),
+        (protocol::WireplugStunResult::DifferentPort(_), protocol::WireplugStunResult::SamePort) => todo!(),
     };
     Ok(nat)
 }

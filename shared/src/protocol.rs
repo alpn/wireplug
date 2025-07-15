@@ -1,5 +1,5 @@
-use std::net::SocketAddr;
 use bincode::{Decode, Encode};
+use std::net::SocketAddr;
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
 
@@ -155,4 +155,3 @@ mod tests {
     }
 }
 */
-
