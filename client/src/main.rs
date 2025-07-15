@@ -65,6 +65,8 @@ fn main() -> Result<(), std::io::Error> {
                 port_to_announce,
                 lan_addrs,
             )?;
+            println!("waiting for peers to attempt handshakes..");
+            thread::sleep(Duration::from_secs(protocol::POST_UPDATE_INTERVAL));
         }
         thread::sleep(Duration::from_secs(protocol::MONITORING_INTERVAL));
     }

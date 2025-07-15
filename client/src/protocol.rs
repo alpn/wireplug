@@ -12,6 +12,7 @@ use crate::wg_interface;
 const WIREPLUG_ORG: &str = "wireplug.org:4455";
 
 pub(crate) const MONITORING_INTERVAL: u64 = 30;
+pub(crate) const POST_UPDATE_INTERVAL: u64 = 60;
 // WireGuard's rekey interval, and some
 const LAST_HANDSHAKE_MAX: u64 = 125;
 const _RETRY_INTERVAL_SEC: u64 = 10;
