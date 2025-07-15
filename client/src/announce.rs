@@ -1,5 +1,8 @@
-use shared::{self,protocol, BINCODE_CONFIG};
 use ipnet::IpNet;
+use shared::{
+    self, BINCODE_CONFIG,
+    protocol::{self},
+};
 use std::{
     io::{Read, Write},
     net::{SocketAddr, TcpStream},
@@ -13,18 +16,9 @@ const WIREPLUG_ORG: &str = "wireplug.org:4455";
 const _RETRY_INTERVAL_SEC: u64 = 10;
 
 fn send_announcement(
-    initiator_pubkey: &Key,
-    peer_pubkey: &Key,
-    port: u16,
-    lan_addrs: &Option<Vec<String>>,
+    announcement: protocol::WireplugAnnounce,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
     let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
-    let announcement = protocol::WireplugAnnounce::new(
-        &initiator_pubkey.to_base64(),
-        &peer_pubkey.to_base64(),
-        port,
-        lan_addrs.to_owned(),
-    );
 
     let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
@@ -54,8 +48,15 @@ pub(crate) fn announce_and_update_peers(
     };
 
     for peer in peers {
+        let announcement = protocol::WireplugAnnounce::new(
+            &initiator_pubkey.to_base64(),
+            &peer.to_base64(),
+            announcement_port,
+            lan_addrs.to_owned(),
+        );
+
         print!("announcing ourselves to {} .. ", &peer.to_base64());
-        let response = send_announcement(initiator_pubkey, &peer, announcement_port, &lan_addrs)?;
+        let response = send_announcement(announcement)?;
         if !response.valid() {
             return Err(std::io::Error::other("invalid response"));
         }
