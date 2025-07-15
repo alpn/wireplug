@@ -15,10 +15,10 @@ const WIREPLUG_ORG: &str = "wireplug.org:4455";
 
 const _RETRY_INTERVAL_SEC: u64 = 10;
 
-fn send_announcement(
+fn send_announcement<S : Read + Write>(
+    stream: &mut S,
     announcement: protocol::WireplugAnnounce,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
-    let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
 
     let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
@@ -47,6 +47,8 @@ pub(crate) fn announce_and_update_peers(
         )));
     };
 
+    let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
+
     for peer in peers {
         let announcement = protocol::WireplugAnnounce::new(
             &initiator_pubkey.to_base64(),
@@ -56,7 +58,7 @@ pub(crate) fn announce_and_update_peers(
         );
 
         print!("announcing ourselves to {} .. ", &peer.to_base64());
-        let response = send_announcement(announcement)?;
+        let response = send_announcement(&mut stream, announcement)?;
         if !response.valid() {
             return Err(std::io::Error::other("invalid response"));
         }
