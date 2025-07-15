@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use shared::{BINCODE_CONFIG, protocol::{self}};
+use shared::{BINCODE_CONFIG, protocol};
 use tokio::{net::UdpSocket, sync::Mutex};
 
 pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {

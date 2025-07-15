@@ -1,7 +1,7 @@
 use ipnet::IpNet;
 use shared::{
     self, BINCODE_CONFIG,
-    protocol::{self},
+    protocol,
 };
 use std::{
     io::{Read, Write},

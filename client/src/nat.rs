@@ -1,4 +1,4 @@
-use shared::{protocol::{self}, BINCODE_CONFIG};
+use shared::{protocol, BINCODE_CONFIG};
 use std::net::{SocketAddr, UdpSocket};
 
 #[derive(Debug)]
