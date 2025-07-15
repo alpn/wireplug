@@ -2,7 +2,8 @@
 use std::io;
 use std::{
     net::{IpAddr, SocketAddr},
-    str::FromStr, time::{Duration, SystemTime},
+    str::FromStr,
+    time::{Duration, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -180,7 +181,8 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
                 .duration_since(last_handshake)
                 .map_err(|e| std::io::Error::other(format!("{e}")))?;
 
-            if duration > Duration::from_secs(std::cmp::max(
+            if duration
+                > Duration::from_secs(std::cmp::max(
                     peer.config.persistent_keepalive_interval.unwrap_or(0) as u64,
                     shared::LAST_HANDSHAKE_MAX,
                 ))

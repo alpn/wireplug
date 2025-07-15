@@ -1,9 +1,9 @@
 use clap::Parser;
 use std::{thread, time::Duration};
 
+pub mod announce;
 pub mod config;
 pub mod nat;
-pub mod protocol;
 pub mod utils;
 pub mod wg_interface;
 
@@ -48,7 +48,7 @@ fn main() -> Result<(), std::io::Error> {
                     nat::NatKind::Manageable(port_mapping_nat) => port_mapping_nat.obsereved_port,
                     nat::NatKind::Hard => {
                         println!("can't do much about Hard NAT atm, will try again in a bit .. ");
-                        thread::sleep(Duration::from_secs(protocol::MONITORING_INTERVAL));
+                        thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
                         continue;
                     }
                 };
@@ -59,15 +59,15 @@ fn main() -> Result<(), std::io::Error> {
             } else {
                 listen_port
             };
-            protocol::announce_and_update_peers(
+            announce::announce_and_update_peers(
                 ifname,
                 inactive_peers,
                 port_to_announce,
                 lan_addrs,
             )?;
             println!("waiting for peers to attempt handshakes..");
-            thread::sleep(Duration::from_secs(protocol::POST_UPDATE_INTERVAL));
+            thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
         }
-        thread::sleep(Duration::from_secs(protocol::MONITORING_INTERVAL));
+        thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
     }
 }

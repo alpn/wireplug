@@ -1,5 +1,5 @@
+use shared::{self,protocol, BINCODE_CONFIG};
 use ipnet::IpNet;
-use shared::{BINCODE_CONFIG, WireplugAnnounce, WireplugResponse};
 use std::{
     io::{Read, Write},
     net::{SocketAddr, TcpStream},
@@ -17,9 +17,9 @@ fn send_announcement(
     peer_pubkey: &Key,
     port: u16,
     lan_addrs: &Option<Vec<String>>,
-) -> Result<WireplugResponse, std::io::Error> {
+) -> Result<protocol::WireplugResponse, std::io::Error> {
     let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
-    let announcement = WireplugAnnounce::new(
+    let announcement = protocol::WireplugAnnounce::new(
         &initiator_pubkey.to_base64(),
         &peer_pubkey.to_base64(),
         port,
@@ -32,7 +32,7 @@ fn send_announcement(
     stream.write_all(&buf)?;
     let mut res = [0u8; 1024];
     let _ = stream.read(&mut res)?;
-    let (response, _): (WireplugResponse, usize) =
+    let (response, _): (protocol::WireplugResponse, usize) =
         bincode::decode_from_slice(&res[..], BINCODE_CONFIG)
             .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
@@ -60,8 +60,8 @@ pub(crate) fn announce_and_update_peers(
             return Err(std::io::Error::other("invalid response"));
         }
         match response.peer_endpoint {
-            shared::WireplugEndpoint::Unknown => println!("| wireplug.org: peer is unknown"),
-            shared::WireplugEndpoint::LocalNetwork {
+            protocol::WireplugEndpoint::Unknown => println!("| wireplug.org: peer is unknown"),
+            protocol::WireplugEndpoint::LocalNetwork {
                 lan_addrs,
                 listen_port,
             } => {
@@ -73,7 +73,7 @@ pub(crate) fn announce_and_update_peers(
                     wg_interface::update_peer(&iface, &peer, addr)?;
                 }
             }
-            shared::WireplugEndpoint::RemoteNetwork(wan_addr) => {
+            protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 println!("| wireplug.org: peer is @{wan_addr}");
                 wg_interface::update_peer(&iface, &peer, wan_addr)?;
             }

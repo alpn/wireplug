@@ -1,24 +1,13 @@
-use bincode::config::Configuration;
-use bincode::{Decode, Encode};
 use std::net::SocketAddr;
+use bincode::{Decode, Encode};
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
-pub const COMMON_PKA: u16 = 25;
 
-// WireGuard's rekey interval, and some
-pub const LAST_HANDSHAKE_MAX: u64 = 125;
-
-pub mod protocol;
 pub const MONITORING_INTERVAL: u64 = 30;
 pub const POST_UPDATE_INTERVAL: u64 = 60;
-
-pub const BINCODE_CONFIG: Configuration<
-    bincode::config::LittleEndian,
-    bincode::config::Fixint,
-    bincode::config::Limit<256>,
-> = bincode::config::standard()
-    .with_fixed_int_encoding()
-    .with_limit::<256>();
+pub const COMMON_PKA: u16 = 25;
+// WireGuard's rekey interval, and some
+pub const LAST_HANDSHAKE_MAX: u64 = 125;
 
 fn is_valid_wgkey(s: &String) -> bool {
     if s.len() != 44 {
@@ -109,6 +98,7 @@ impl WireplugResponse {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugStunRequest {
+    // Add ID to get stats about hard NATs
     proto: String,
     pub port: u16,
 }
@@ -165,3 +155,4 @@ mod tests {
     }
 }
 */
+
