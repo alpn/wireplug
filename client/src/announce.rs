@@ -1,21 +1,16 @@
+use crate::wg_interface;
 use ipnet::IpNet;
-use shared::{
-    self, BINCODE_CONFIG,
-    protocol,
-};
+use shared::{self, BINCODE_CONFIG, WP_WIREPLUG_ORG, protocol};
 use std::{
-    io::{Read, Write},
+    io::{Error, Read, Write},
     net::{SocketAddr, TcpStream},
     str::FromStr,
 };
 use wireguard_control::{Backend, Device, Key};
 
-use crate::wg_interface;
-const WIREPLUG_ORG: &str = "wireplug.org:4455";
-
 const _RETRY_INTERVAL_SEC: u64 = 10;
 
-fn send_announcement<S : Read + Write>(
+fn send_announcement<S: Read + Write>(
     stream: &mut S,
     announcement: protocol::WireplugAnnounce,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
@@ -33,6 +28,20 @@ fn send_announcement<S : Read + Write>(
     Ok(response)
 }
 
+fn get_tls_client_connection() -> Result<rustls::ClientConnection, rustls::Error> {
+    let root_store = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    let config = rustls::ClientConfig::builder_with_provider(
+        rustls::crypto::ring::default_provider().into(),
+    )
+    .with_safe_default_protocol_versions()?
+    .with_root_certificates(root_store)
+    .with_no_client_auth();
+    let config = std::sync::Arc::new(config);
+    rustls::ClientConnection::new(config, shared::WIREPLUG_ORG_DOMAIN.try_into().unwrap())
+}
+
 pub(crate) fn announce_and_update_peers(
     if_name: &String,
     peers: Vec<Key>,
@@ -48,7 +57,10 @@ pub(crate) fn announce_and_update_peers(
         )));
     };
 
-    let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
+    let mut socket = TcpStream::connect(WP_WIREPLUG_ORG)?;
+    let mut client_connection = get_tls_client_connection()
+        .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
+    let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
 
     let mut updated_some = false;
     for peer in peers {

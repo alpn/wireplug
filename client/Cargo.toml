@@ -14,3 +14,5 @@ clap = { version = "4.5.40", features = ["derive"] }
 toml = "0.8.23"
 rand = "0.9.1"
 getifaddrs = "0.2.0"
+webpki-roots = "1.0.1"
+rustls = { version = "0.23.29", default-features = false, features = ["std", "ring"] }

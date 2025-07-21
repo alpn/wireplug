@@ -52,7 +52,7 @@ fn main() -> Result<(), std::io::Error> {
                         continue;
                     }
                 };
-                println!("updating port..");
+                println!("updating listen port to {new_listen_port} ..");
                 std::thread::sleep(Duration::from_secs(3));
                 wg_interface::update_port(ifname, new_listen_port)?;
                 observed_port
