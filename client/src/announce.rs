@@ -2,7 +2,7 @@ use crate::wg_interface;
 use ipnet::IpNet;
 use shared::{self, BINCODE_CONFIG, WP_WIREPLUG_ORG, protocol};
 use std::{
-    io::{Error, Read, Write},
+    io::{Read, Write},
     net::{SocketAddr, TcpStream},
     str::FromStr,
 };
@@ -14,7 +14,6 @@ fn send_announcement<S: Read + Write>(
     stream: &mut S,
     announcement: protocol::WireplugAnnounce,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
-
     let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
@@ -48,7 +47,6 @@ pub(crate) fn announce_and_update_peers(
     announcement_port: u16,
     lan_addrs: Option<Vec<String>>,
 ) -> Result<bool, std::io::Error> {
-
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     let Some(initiator_pubkey) = &device.public_key.clone() else {

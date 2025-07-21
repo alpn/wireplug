@@ -1,4 +1,4 @@
-use shared::{protocol, BINCODE_CONFIG};
+use shared::{BINCODE_CONFIG, protocol};
 use std::net::{SocketAddr, UdpSocket};
 
 #[derive(Debug)]
@@ -56,8 +56,13 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
         send_stun_request(stun1, local_port)?.result,
         send_stun_request(stun2, local_port)?.result,
     ) {
-        (protocol::WireplugStunResult::SamePort, protocol::WireplugStunResult::SamePort) => NatKind::Easy,
-        (protocol::WireplugStunResult::DifferentPort(port1), protocol::WireplugStunResult::DifferentPort(port2)) => {
+        (protocol::WireplugStunResult::SamePort, protocol::WireplugStunResult::SamePort) => {
+            NatKind::Easy
+        }
+        (
+            protocol::WireplugStunResult::DifferentPort(port1),
+            protocol::WireplugStunResult::DifferentPort(port2),
+        ) => {
             if port1 == port2 {
                 let observed_port = port1;
                 NatKind::Manageable(PortMappingNat::new(local_port, observed_port))
@@ -65,8 +70,14 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
                 NatKind::Hard
             }
         }
-        (protocol::WireplugStunResult::SamePort, protocol::WireplugStunResult::DifferentPort(_)) => todo!(),
-        (protocol::WireplugStunResult::DifferentPort(_), protocol::WireplugStunResult::SamePort) => todo!(),
+        (
+            protocol::WireplugStunResult::SamePort,
+            protocol::WireplugStunResult::DifferentPort(_),
+        ) => todo!(),
+        (
+            protocol::WireplugStunResult::DifferentPort(_),
+            protocol::WireplugStunResult::SamePort,
+        ) => todo!(),
     };
     Ok(nat)
 }
