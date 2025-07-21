@@ -1,9 +1,7 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-    time::{Duration, SystemTime},
+    net::{IpAddr, SocketAddr}, str::FromStr, time::{Duration, SystemTime}
 };
 
 use ipnet::IpNet;
