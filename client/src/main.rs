@@ -59,14 +59,15 @@ fn main() -> Result<(), std::io::Error> {
             } else {
                 listen_port
             };
-            announce::announce_and_update_peers(
+            if announce::announce_and_update_peers(
                 ifname,
                 inactive_peers,
                 port_to_announce,
                 lan_addrs,
-            )?;
-            println!("waiting for peers to attempt handshakes..");
-            thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
+            )? {
+                println!("waiting for peers to attempt handshakes..");
+                thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
+            }
         }
         thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
     }

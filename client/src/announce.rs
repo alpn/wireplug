@@ -38,7 +38,8 @@ pub(crate) fn announce_and_update_peers(
     peers: Vec<Key>,
     announcement_port: u16,
     lan_addrs: Option<Vec<String>>,
-) -> Result<(), std::io::Error> {
+) -> Result<bool, std::io::Error> {
+
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     let Some(initiator_pubkey) = &device.public_key.clone() else {
@@ -49,6 +50,7 @@ pub(crate) fn announce_and_update_peers(
 
     let mut stream = TcpStream::connect(WIREPLUG_ORG)?;
 
+    let mut updated_some = false;
     for peer in peers {
         let announcement = protocol::WireplugAnnounce::new(
             &initiator_pubkey.to_base64(),
@@ -74,13 +76,15 @@ pub(crate) fn announce_and_update_peers(
                         .map_err(|e| std::io::Error::other(format!("{e}")))?;
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
                     wg_interface::update_peer(&iface, &peer, addr)?;
+                    updated_some = true;
                 }
             }
             protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 println!("| wireplug.org: peer is @{wan_addr}");
                 wg_interface::update_peer(&iface, &peer, wan_addr)?;
+                updated_some = true;
             }
         }
     }
-    Ok(())
+    Ok(updated_some)
 }
