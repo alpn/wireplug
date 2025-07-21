@@ -1,13 +1,19 @@
 use chrono::Utc;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-use shared::{BINCODE_CONFIG, protocol};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use shared::{BINCODE_CONFIG, WP_WIREPLUG_ORG, protocol};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpListener;
 use tokio::sync::{Mutex, RwLock};
+
+use rustls::pki_types::pem::PemObject;
+use tokio_rustls::{TlsAcceptor, rustls};
 
 #[cfg(target_os = "openbsd")]
 use openbsd::pledge;
@@ -24,27 +30,34 @@ type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 
-async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::Result<()> {
+async fn handle_connection<S>(
+    mut stream: S,
+    peer_addr: SocketAddr,
+    storage: Storage,
+) -> std::io::Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
     let mut buffer = [0u8; 1024];
     stream.read(&mut buffer).await?;
     let (announcement, _): (protocol::WireplugAnnounce, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)
             .map_err(|e| std::io::Error::other(format!("decoding error: {e}")))?;
 
-    let announcer_ip = stream.peer_addr()?;
+    let announcer_ip = peer_addr.ip();
     if !announcement.valid() {
         stream.shutdown().await?;
         return Ok(());
     }
 
-    let addr = SocketAddr::new(announcer_ip.ip(), announcement.listen_port);
+    let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
     storage.write().await.insert(
         (
             announcement.initiator_pubkey.to_owned(),
             announcement.peer_pubkey.to_owned(),
         ),
         Record {
-            wan_addr: addr,
+            wan_addr: peer_wg_wan_addr,
             lan_addrs: announcement.lan_addrs,
             timestamp: SystemTime::now(),
         },
@@ -57,7 +70,7 @@ async fn handle_connection(mut stream: TcpStream, storage: Storage) -> std::io::
         .cloned()
     {
         Some(record) => {
-            if announcer_ip.ip() == record.wan_addr.ip() {
+            if announcer_ip == record.wan_addr.ip() {
                 protocol::WireplugResponse::from_lan_addrs(
                     record.lan_addrs.map_or(vec![], |v| v),
                     record.wan_addr.port(),
@@ -93,6 +106,25 @@ async fn status(storage: &Storage) {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     #[cfg(target_os = "openbsd")]
+    openbsd::pledge!("stdio inet rpath", "").map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("pledge: {}", e.to_string()),
+        )
+    })?;
+
+    //XXX: unveil here
+    let cert = PathBuf::from_str(CERT_PATH)
+        .map_err(|e| std::io::Error::other(format!("tls - failed to load cert: {e}")))?;
+    let pem_file = PathBuf::from_str(KEY_PATH)
+        .map_err(|e| std::io::Error::other(format!("tls - failed to load key: {e}")))?;
+    let certs = CertificateDer::pem_file_iter(&cert)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let key = PrivateKeyDer::from_pem_file(&pem_file).unwrap();
+
+    #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet", "").map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -100,7 +132,6 @@ async fn main() -> std::io::Result<()> {
         )
     })?;
 
-    let listener = TcpListener::bind("0.0.0.0:4455").await?;
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
     let arc_mutex = Arc::new(Mutex::new(()));
 
@@ -146,11 +177,21 @@ async fn main() -> std::io::Result<()> {
         stun::start_serving(stun2, mtx).await;
     });
 
+    let config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)
+        .unwrap();
+    let acceptor = TlsAcceptor::from(Arc::new(config));
+    let listener = TcpListener::bind(WP_WIREPLUG_ORG).await?;
+
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, peer_addrs) = listener.accept().await?;
+        let acceptor = acceptor.clone();
         let s = Arc::clone(&storage);
+
         tokio::spawn(async move {
-            if let Err(e) = handle_connection(socket, s).await {
+            let stream = acceptor.accept(socket).await.unwrap();
+            if let Err(e) = handle_connection(stream, peer_addrs, s).await {
                 eprintln!("{e}");
             }
         });
