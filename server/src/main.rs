@@ -158,17 +158,13 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         }
     });
 
-    let mtx = Arc::clone(&arc_mutex);
-    tokio::spawn(async move {
-        let stun1 = shared::WIREPLUG_ORG_STUN1.to_string();
-        stun::start_serving(stun1, mtx).await;
-    });
-
-    let mtx = Arc::clone(&arc_mutex);
-    tokio::spawn(async move {
-        let stun2 = shared::WIREPLUG_ORG_STUN2.to_string();
-        stun::start_serving(stun2, mtx).await;
-    });
+    for stun_addr in config.stun_listen_on {
+        let mtx = Arc::clone(&arc_mutex);
+        tokio::spawn(async move {
+            let bind_to = format!("{stun_addr}:{}", shared::WIREPLUG_STUN_PORT);
+            stun::start_serving(bind_to, mtx).await;
+        });
+    }
 
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()

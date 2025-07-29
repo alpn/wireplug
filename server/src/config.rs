@@ -4,6 +4,8 @@ use std::io::{self, Error};
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct Config {
+    pub wp_listen_on: String,
+    pub stun_listen_on: Vec<String>,
     pub cert_path: String,
     pub key_path: String,
 }
