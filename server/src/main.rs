@@ -172,8 +172,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
-        .with_single_cert(cert, key)
-        .unwrap();
+        .with_single_cert(cert, key)?;
     let acceptor = TlsAcceptor::from(Arc::new(config));
     let listener = TcpListener::bind(WP_WIREPLUG_ORG).await?;
 
@@ -183,7 +182,13 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         let s = Arc::clone(&storage);
 
         tokio::spawn(async move {
-            let stream = acceptor.accept(socket).await.unwrap();
+            let stream = match acceptor.accept(socket).await {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("{e}");
+                    return;
+                }
+            };
             if let Err(e) = handle_connection(stream, peer_addrs, s).await {
                 eprintln!("{e}");
             }
