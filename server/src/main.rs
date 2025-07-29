@@ -111,35 +111,19 @@ async fn status(storage: &Storage) {
     }
 }
 
-async fn start(cli: Cli) -> std::io::Result<()> {
+async fn start(cli: Cli) -> anyhow::Result<()> {
     #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet rpath", "").map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("pledge: {}", e.to_string()),
-        )
-    })?;
-
+    openbsd::pledge!("stdio inet rpath", "")?;
     //XXX: unveil here
     let config = config::read_from_file(&cli.config)?;
-    let cert_path = PathBuf::from_str(&config.cert_path)
-        .map_err(|e| std::io::Error::other(format!("tls - failed to load cert: {e}")))?;
-    let key_path = PathBuf::from_str(&config.key_path)
-        .map_err(|e| std::io::Error::other(format!("tls - failed to load key: {e}")))?;
+    let cert_path = PathBuf::from_str(&config.cert_path)?;
+    let key_path = PathBuf::from_str(&config.key_path)?;
 
-    let cert = CertificateDer::pem_file_iter(&cert_path)
-        .unwrap()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-    let key = PrivateKeyDer::from_pem_file(&key_path).unwrap();
+    let cert = CertificateDer::pem_file_iter(&cert_path)?.collect::<Result<Vec<_>, _>>()?;
+    let key = PrivateKeyDer::from_pem_file(&key_path)?;
 
     #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet", "").map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("pledge: {}", e.to_string()),
-        )
-    })?;
+    openbsd::pledge!("stdio inet", "")?;
 
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
     let arc_mutex = Arc::new(Mutex::new(()));
@@ -215,7 +199,7 @@ fn main() {
         .expect("could not build tokio runtime");
 
     if let Err(e) = rt.block_on(start(cli)) {
-        eprintln!("{e}");
+        eprintln!("fatal: {e}");
         std::process::exit(1);
     }
 }
