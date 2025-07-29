@@ -1,5 +1,5 @@
-use clap::Parser;
 use chrono::Utc;
+use clap::Parser;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -19,8 +19,8 @@ use tokio_rustls::{TlsAcceptor, rustls};
 #[cfg(target_os = "openbsd")]
 use openbsd::pledge;
 
-pub mod stun;
 pub mod config;
+pub mod stun;
 
 #[derive(Parser)]
 #[command(version, name="wireplugd", about="", long_about = None)]
@@ -111,8 +111,7 @@ async fn status(storage: &Storage) {
     }
 }
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
+async fn start(cli: Cli) -> std::io::Result<()> {
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet rpath", "").map_err(|e| {
         std::io::Error::new(
@@ -121,7 +120,6 @@ async fn main() -> std::io::Result<()> {
         )
     })?;
 
-    let cli = Cli::parse();
     //XXX: unveil here
     let config = config::read_from_file(&cli.config)?;
     let cert_path = PathBuf::from_str(&config.cert_path)
@@ -129,7 +127,7 @@ async fn main() -> std::io::Result<()> {
     let key_path = PathBuf::from_str(&config.key_path)
         .map_err(|e| std::io::Error::other(format!("tls - failed to load key: {e}")))?;
 
-    let certs = CertificateDer::pem_file_iter(&cert_path)
+    let cert = CertificateDer::pem_file_iter(&cert_path)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
@@ -190,7 +188,7 @@ async fn main() -> std::io::Result<()> {
 
     let config = rustls::ServerConfig::builder()
         .with_no_client_auth()
-        .with_single_cert(certs, key)
+        .with_single_cert(cert, key)
         .unwrap();
     let acceptor = TlsAcceptor::from(Arc::new(config));
     let listener = TcpListener::bind(WP_WIREPLUG_ORG).await?;
@@ -206,5 +204,18 @@ async fn main() -> std::io::Result<()> {
                 eprintln!("{e}");
             }
         });
+    }
+}
+
+fn main() {
+    let cli = Cli::parse();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("could not build tokio runtime");
+
+    if let Err(e) = rt.block_on(start(cli)) {
+        eprintln!("{e}");
+        std::process::exit(1);
     }
 }
