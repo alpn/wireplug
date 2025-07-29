@@ -1,3 +1,4 @@
+use clap::Parser;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -19,6 +20,13 @@ use tokio_rustls::{TlsAcceptor, rustls};
 use openbsd::pledge;
 
 pub mod stun;
+pub mod config;
+
+#[derive(Parser)]
+#[command(version, name="wireplugd", about="", long_about = None)]
+struct Cli {
+    config: String,
+}
 
 #[derive(Clone)]
 struct Record {
@@ -113,10 +121,12 @@ async fn main() -> std::io::Result<()> {
         )
     })?;
 
+    let cli = Cli::parse();
     //XXX: unveil here
-    let cert = PathBuf::from_str(CERT_PATH)
+    let config = config::read_from_file(&cli.config)?;
+    let cert = PathBuf::from_str(&config.cert_path)
         .map_err(|e| std::io::Error::other(format!("tls - failed to load cert: {e}")))?;
-    let pem_file = PathBuf::from_str(KEY_PATH)
+    let pem_file = PathBuf::from_str(&config.key_path)
         .map_err(|e| std::io::Error::other(format!("tls - failed to load key: {e}")))?;
     let certs = CertificateDer::pem_file_iter(&cert)
         .unwrap()
