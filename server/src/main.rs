@@ -124,15 +124,16 @@ async fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
     //XXX: unveil here
     let config = config::read_from_file(&cli.config)?;
-    let cert = PathBuf::from_str(&config.cert_path)
+    let cert_path = PathBuf::from_str(&config.cert_path)
         .map_err(|e| std::io::Error::other(format!("tls - failed to load cert: {e}")))?;
-    let pem_file = PathBuf::from_str(&config.key_path)
+    let key_path = PathBuf::from_str(&config.key_path)
         .map_err(|e| std::io::Error::other(format!("tls - failed to load key: {e}")))?;
-    let certs = CertificateDer::pem_file_iter(&cert)
+
+    let certs = CertificateDer::pem_file_iter(&cert_path)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    let key = PrivateKeyDer::from_pem_file(&pem_file).unwrap();
+    let key = PrivateKeyDer::from_pem_file(&key_path).unwrap();
 
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet", "").map_err(|e| {
