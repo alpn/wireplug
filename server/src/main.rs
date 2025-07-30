@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-use shared::{BINCODE_CONFIG, WP_WIREPLUG_ORG, protocol};
+use shared::{BINCODE_CONFIG, protocol};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, RwLock};
@@ -166,11 +166,12 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         });
     }
 
-    let config = rustls::ServerConfig::builder()
+    let tls_config = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(cert, key)?;
-    let acceptor = TlsAcceptor::from(Arc::new(config));
-    let listener = TcpListener::bind(WP_WIREPLUG_ORG).await?;
+    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+    let wp_listen_addr = format!("{}:443",config.wp_listen_on);
+    let listener = TcpListener::bind(wp_listen_addr).await?;
 
     loop {
         let (socket, peer_addrs) = listener.accept().await?;
