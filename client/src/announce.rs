@@ -27,7 +27,7 @@ fn send_announcement<S: Read + Write>(
     Ok(response)
 }
 
-fn get_tls_client_connection() -> Result<rustls::ClientConnection, rustls::Error> {
+fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
     let root_store = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
@@ -38,7 +38,7 @@ fn get_tls_client_connection() -> Result<rustls::ClientConnection, rustls::Error
     .with_root_certificates(root_store)
     .with_no_client_auth();
     let config = std::sync::Arc::new(config);
-    rustls::ClientConnection::new(config, shared::WIREPLUG_ORG_DOMAIN.try_into().unwrap())
+    Ok(rustls::ClientConnection::new(config, shared::WIREPLUG_ORG_DOMAIN_TMP.try_into()?)?)
 }
 
 pub(crate) fn announce_and_update_peers(

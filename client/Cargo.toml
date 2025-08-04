@@ -16,3 +16,4 @@ rand = "0.9.1"
 getifaddrs = "0.2.0"
 webpki-roots = "1.0.1"
 rustls = { version = "0.23.29", default-features = false, features = ["std", "ring"] }
+anyhow = "1.0.98"
