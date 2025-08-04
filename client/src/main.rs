@@ -17,7 +17,7 @@ struct Cli {
     no_nat: bool,
 }
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let ifname = &cli.interface_name;
     wg_interface::show_config(ifname)?;

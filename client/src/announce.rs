@@ -38,7 +38,10 @@ fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
     .with_root_certificates(root_store)
     .with_no_client_auth();
     let config = std::sync::Arc::new(config);
-    Ok(rustls::ClientConnection::new(config, shared::WIREPLUG_ORG_DOMAIN_TMP.try_into()?)?)
+    Ok(rustls::ClientConnection::new(
+        config,
+        shared::WIREPLUG_ORG_DOMAIN_TMP.try_into()?,
+    )?)
 }
 
 pub(crate) fn announce_and_update_peers(

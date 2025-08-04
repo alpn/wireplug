@@ -1,7 +1,9 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    net::{IpAddr, SocketAddr}, str::FromStr, time::{Duration, SystemTime}
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    time::{Duration, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -99,7 +101,7 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
-pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io::Error> {
+pub(crate) fn configure(ifname: &String, config: &Config) -> anyhow::Result<()> {
     println!("configuring interface {ifname}..");
     let ifname: InterfaceName = ifname.parse()?;
 
@@ -110,7 +112,7 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
                 .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
         )
         .set_persistent_keepalive_interval(protocol::COMMON_PKA)
-        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str()).unwrap(), 32);
+        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32);
         peers.push(peer_config);
     }
 
@@ -120,9 +122,9 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> Result<(), std::io:
     };
 
     let update = DeviceUpdate::new()
-        .set_keypair(KeyPair::from_private(
-            Key::from_base64(&config.interface.private_key).unwrap(),
-        ))
+        .set_keypair(KeyPair::from_private(Key::from_base64(
+            &config.interface.private_key,
+        )?))
         .set_listen_port(listen_port)
         .add_peers(&peers);
     update.apply(&ifname, Backend::default())?;
