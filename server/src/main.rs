@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-use shared::{BINCODE_CONFIG, protocol};
+use shared::{protocol, TmpLogger, BINCODE_CONFIG};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, RwLock};
@@ -38,6 +38,7 @@ struct Record {
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
+static LOGGER : TmpLogger = TmpLogger;
 
 async fn handle_connection<S>(
     mut stream: S,
@@ -118,6 +119,9 @@ async fn status(storage: &Storage) {
 }
 
 async fn start(cli: Cli) -> anyhow::Result<()> {
+    log::set_max_level(log::LevelFilter::Trace);
+    log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
+    log::info!("starting wireplug server");
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet rpath", "")?;
     //XXX: unveil here
@@ -166,6 +170,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     for stun_addr in config.stun_listen_on {
         let mtx = Arc::clone(&arc_mutex);
+        log::info!("spawning STUN service @{stun_addr:?}");
         tokio::spawn(async move {
             let bind_to = format!("{stun_addr}:{}", shared::WIREPLUG_STUN_PORT);
             stun::start_serving(bind_to, mtx).await;
@@ -177,10 +182,11 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         .with_single_cert(cert, key)?;
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
     let wp_listen_addr = format!("{}:443", config.wp_listen_on);
+    log::info!("serving peer discovery @{wp_listen_addr:?}");
     let listener = TcpListener::bind(wp_listen_addr).await?;
 
     loop {
-        let (socket, peer_addrs) = listener.accept().await?;
+        let (socket, peer_addr) = listener.accept().await?;
         let acceptor = acceptor.clone();
         let s = Arc::clone(&storage);
 
@@ -188,12 +194,14 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
             let stream = match acceptor.accept(socket).await {
                 Ok(s) => s,
                 Err(e) => {
-                    eprintln!("{e}");
+                    log::error!("{e}");
                     return;
                 }
             };
-            if let Err(e) = handle_connection(stream, peer_addrs, s).await {
-                eprintln!("{e}");
+
+            log::info!("handling request over TLS from {peer_addr:?}");
+            if let Err(e) = handle_connection(stream, peer_addr, s).await {
+                log::error!("{e}");
             }
         });
     }
