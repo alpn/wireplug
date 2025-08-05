@@ -1,5 +1,6 @@
 use chrono::Utc;
 use clap::Parser;
+use shared::protocol::{WireplugEndpoint, WireplugResponse};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -59,37 +60,47 @@ where
     }
 
     let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
-    storage.write().await.insert(
-        (
-            announcement.initiator_pubkey.to_owned(),
-            announcement.peer_pubkey.to_owned(),
-        ),
-        Record {
-            wan_addr: peer_wg_wan_addr,
-            lan_addrs: announcement.lan_addrs,
-            timestamp: SystemTime::now(),
-        },
-    );
-
-    let response = match storage
-        .read()
-        .await
-        .get(&(announcement.peer_pubkey, announcement.initiator_pubkey))
-        .cloned()
     {
-        Some(record) => {
-            if announcer_ip == record.wan_addr.ip() {
-                protocol::WireplugResponse::from_lan_addrs(
-                    record.lan_addrs.map_or(vec![], |v| v),
-                    record.wan_addr.port(),
-                )
-            } else {
-                protocol::WireplugResponse::from_sockaddr(record.wan_addr)
-            }
+        let mut storage_writer = storage.write().await;
+        for peer in &announcement.peer_pubkeys {
+            storage_writer.insert(
+                (
+                    announcement.initiator_pubkey.to_owned(),
+                    peer.to_owned(),
+                ),
+                Record {
+                    wan_addr: peer_wg_wan_addr,
+                    lan_addrs: announcement.lan_addrs.to_owned(),
+                    timestamp: SystemTime::now(),
+                },
+            );
         }
-        None => protocol::WireplugResponse::new(),
-    };
+    }
+    let mut res_peers = HashMap::new();
+    {
+        let storage_reader = storage
+            .read()
+            .await;
 
+        for peer in announcement.peer_pubkeys {
+            let peer_endpoint;
+            match storage_reader.get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned())){
+                Some(record) => {
+                if announcer_ip == record.wan_addr.ip() {
+                    peer_endpoint = WireplugEndpoint::LocalNetwork {
+                        lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
+                        listen_port: record.wan_addr.port(),
+                    };
+                    } else {
+                        peer_endpoint = WireplugEndpoint::RemoteNetwork(record.wan_addr);
+                    }
+                }
+                None => peer_endpoint = WireplugEndpoint::Unknown,
+            }
+            res_peers.insert(peer.to_owned(), peer_endpoint);
+        }
+    }
+    let response = WireplugResponse::from_peer_endpoints(res_peers);
     let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
     stream.write_all(&buffer).await?;

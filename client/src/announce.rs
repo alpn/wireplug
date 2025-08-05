@@ -63,21 +63,27 @@ pub(crate) fn announce_and_update_peers(
         .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
 
-    let mut updated_some = false;
-    for peer in peers {
-        let announcement = protocol::WireplugAnnounce::new(
-            &initiator_pubkey.to_base64(),
-            &peer.to_base64(),
-            announcement_port,
-            lan_addrs.to_owned(),
-        );
+    let announcement = protocol::WireplugAnnounce::new(
+        &initiator_pubkey.to_base64(),
+        peers.iter().map(|p| p.to_base64()).collect(),
+        announcement_port,
+        lan_addrs.to_owned(),
 
-        print!("announcing ourselves to {} .. ", &peer.to_base64());
-        let response = send_announcement(&mut stream, announcement)?;
-        if !response.valid() {
-            return Err(std::io::Error::other("invalid response"));
-        }
-        match response.peer_endpoint {
+    );
+
+    let response = send_announcement(&mut stream, announcement)?;
+    if !response.valid() {
+        return Err(std::io::Error::other("invalid response"));
+    }
+
+    let mut updated_some = false;
+    for (peer , peer_endpoint) in  response.peer_endpoints {
+
+        let Ok(peer_pubkey)= Key::from_base64(&peer) else {
+            eprintln!("bad peer pubkey");
+            continue;
+        };
+        match peer_endpoint {
             protocol::WireplugEndpoint::Unknown => println!("| wireplug.org: peer is unknown"),
             protocol::WireplugEndpoint::LocalNetwork {
                 lan_addrs,
@@ -88,13 +94,13 @@ pub(crate) fn announce_and_update_peers(
                     let ipnet = IpNet::from_str(&addr.as_str())
                         .map_err(|e| std::io::Error::other(format!("{e}")))?;
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
-                    wg_interface::update_peer(&iface, &peer, addr)?;
+                    wg_interface::update_peer(&iface, &peer_pubkey, addr)?;
                     updated_some = true;
                 }
             }
             protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 println!("| wireplug.org: peer is @{wan_addr}");
-                wg_interface::update_peer(&iface, &peer, wan_addr)?;
+                wg_interface::update_peer(&iface, &peer_pubkey, wan_addr)?;
                 updated_some = true;
             }
         }

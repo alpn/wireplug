@@ -1,5 +1,5 @@
 use bincode::{Decode, Encode};
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
 
@@ -25,7 +25,7 @@ fn is_valid_wgkey(s: &String) -> bool {
 pub struct WireplugAnnounce {
     proto: String,
     pub initiator_pubkey: String,
-    pub peer_pubkey: String,
+    pub peer_pubkeys: Vec<String>,
     pub listen_port: u16,
     pub lan_addrs: Option<Vec<String>>,
 }
@@ -33,14 +33,14 @@ pub struct WireplugAnnounce {
 impl WireplugAnnounce {
     pub fn new(
         initiator_pubkey: &String,
-        peer_pubkey: &String,
+        peer_pubkeys: Vec<String>,
         listen_port: u16,
         lan_addrs: Option<Vec<String>>,
     ) -> Self {
         WireplugAnnounce {
             proto: String::from(WIREPLUG_PROTOCOL_VERSION),
             initiator_pubkey: initiator_pubkey.to_owned(),
-            peer_pubkey: peer_pubkey.to_owned(),
+            peer_pubkeys,
             listen_port,
             lan_addrs,
         }
@@ -48,7 +48,7 @@ impl WireplugAnnounce {
     pub fn valid(&self) -> bool {
         self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
             && is_valid_wgkey(&self.initiator_pubkey)
-            && is_valid_wgkey(&self.peer_pubkey)
+            && self.peer_pubkeys.iter().all(|p| is_valid_wgkey(p))
             && self.listen_port >= 1024
     }
 }
@@ -66,29 +66,14 @@ pub enum WireplugEndpoint {
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
     proto: String,
-    pub peer_endpoint: WireplugEndpoint,
+    pub peer_endpoints: HashMap<String,WireplugEndpoint>,
 }
 
 impl WireplugResponse {
-    pub fn new() -> Self {
+    pub fn from_peer_endpoints(peer_endpoints: HashMap<String, WireplugEndpoint>) -> Self {
         WireplugResponse {
             proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
-            peer_endpoint: WireplugEndpoint::Unknown,
-        }
-    }
-    pub fn from_sockaddr(endpoint: SocketAddr) -> Self {
-        WireplugResponse {
-            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
-            peer_endpoint: WireplugEndpoint::RemoteNetwork(endpoint),
-        }
-    }
-    pub fn from_lan_addrs(lan_addrs: Vec<String>, listen_port: u16) -> Self {
-        WireplugResponse {
-            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
-            peer_endpoint: WireplugEndpoint::LocalNetwork {
-                lan_addrs,
-                listen_port,
-            },
+            peer_endpoints,
         }
     }
     pub fn valid(&self) -> bool {
