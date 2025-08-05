@@ -53,7 +53,6 @@ pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
             let _ = socket.send_to(&data, addr).await.map_err(|e| {
                 log::error!("{e}");
             });
-            tokio::time::sleep(Duration::from_secs(5)).await;
         });
     }
 }
