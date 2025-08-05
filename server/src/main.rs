@@ -64,10 +64,7 @@ where
         let mut storage_writer = storage.write().await;
         for peer in &announcement.peer_pubkeys {
             storage_writer.insert(
-                (
-                    announcement.initiator_pubkey.to_owned(),
-                    peer.to_owned(),
-                ),
+                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
                 Record {
                     wan_addr: peer_wg_wan_addr,
                     lan_addrs: announcement.lan_addrs.to_owned(),
@@ -78,19 +75,17 @@ where
     }
     let mut res_peers = HashMap::new();
     {
-        let storage_reader = storage
-            .read()
-            .await;
+        let storage_reader = storage.read().await;
 
         for peer in announcement.peer_pubkeys {
             let peer_endpoint;
-            match storage_reader.get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned())){
+            match storage_reader.get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned())) {
                 Some(record) => {
-                if announcer_ip == record.wan_addr.ip() {
-                    peer_endpoint = WireplugEndpoint::LocalNetwork {
-                        lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
-                        listen_port: record.wan_addr.port(),
-                    };
+                    if announcer_ip == record.wan_addr.ip() {
+                        peer_endpoint = WireplugEndpoint::LocalNetwork {
+                            lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
+                            listen_port: record.wan_addr.port(),
+                        };
                     } else {
                         peer_endpoint = WireplugEndpoint::RemoteNetwork(record.wan_addr);
                     }

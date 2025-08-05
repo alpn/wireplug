@@ -66,7 +66,7 @@ pub enum WireplugEndpoint {
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugResponse {
     proto: String,
-    pub peer_endpoints: HashMap<String,WireplugEndpoint>,
+    pub peer_endpoints: HashMap<String, WireplugEndpoint>,
 }
 
 impl WireplugResponse {

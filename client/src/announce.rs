@@ -68,7 +68,6 @@ pub(crate) fn announce_and_update_peers(
         peers.iter().map(|p| p.to_base64()).collect(),
         announcement_port,
         lan_addrs.to_owned(),
-
     );
 
     let response = send_announcement(&mut stream, announcement)?;
@@ -77,9 +76,8 @@ pub(crate) fn announce_and_update_peers(
     }
 
     let mut updated_some = false;
-    for (peer , peer_endpoint) in  response.peer_endpoints {
-
-        let Ok(peer_pubkey)= Key::from_base64(&peer) else {
+    for (peer, peer_endpoint) in response.peer_endpoints {
+        let Ok(peer_pubkey) = Key::from_base64(&peer) else {
             eprintln!("bad peer pubkey");
             continue;
         };
