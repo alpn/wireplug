@@ -5,11 +5,11 @@ use std::{thread, time::Duration};
 pub mod announce;
 pub mod config;
 pub mod nat;
+pub mod netstat;
 pub mod utils;
 pub mod wg_interface;
-pub mod netstat;
 
-static LOGGER : TmpLogger = TmpLogger;
+static LOGGER: TmpLogger = TmpLogger;
 
 #[derive(Parser)]
 #[command(version, name="Wireplug", about="", long_about = None)]
@@ -37,7 +37,9 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
                 log::debug!("NAT: {nat:?}");
                 let observed_port = match nat {
                     nat::NatKind::Easy => new_listen_port,
-                    nat::NatKind::FixedPortMapping(port_mapping_nat) => port_mapping_nat.obsereved_port,
+                    nat::NatKind::FixedPortMapping(port_mapping_nat) => {
+                        port_mapping_nat.obsereved_port
+                    }
                     nat::NatKind::Hard => {
                         log::warn!("can't do much about Hard NAT atm, will try again in a bit .. ");
                         thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
@@ -58,7 +60,9 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
                 port_to_announce,
                 lan_addrs,
             )? {
-                log::info!("some endpoints were updated, waiting for peers to attempt handshakes..");
+                log::info!(
+                    "some endpoints were updated, waiting for peers to attempt handshakes.."
+                );
                 thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
             }
         }
@@ -67,7 +71,6 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
 }
 
 fn start(ifname: &String, config_file: Option<String>, traverse_nat: bool) -> anyhow::Result<()> {
-
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");

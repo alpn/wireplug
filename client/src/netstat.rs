@@ -13,7 +13,10 @@ struct NetInfo {
 
 impl NetInfo {
     fn new() -> Self {
-        Self { wan_ip4: None, wan_ip6: None }
+        Self {
+            wan_ip4: None,
+            wan_ip6: None,
+        }
     }
     fn detect() -> Self {
         let (wan_ip4, wan_ip6) = publicip::get_both();
@@ -22,12 +25,14 @@ impl NetInfo {
 }
 
 pub(crate) struct NetworkMonitor {
-    info: NetInfo
+    info: NetInfo,
 }
 
 impl NetworkMonitor {
     pub fn new() -> Self {
-        Self { info: NetInfo::new()}
+        Self {
+            info: NetInfo::new(),
+        }
     }
     pub fn has_changed(&mut self) -> bool {
         let new_info = NetInfo::detect();
@@ -35,8 +40,8 @@ impl NetworkMonitor {
             return false;
         }
         log::debug!("network status has change!");
-        log::trace!("from: {:?}" ,self.info);
-        log::trace!("to: {:?}" ,new_info);
+        log::trace!("from: {:?}", self.info);
+        log::trace!("to: {:?}", new_info);
         self.info = new_info;
         true
     }

@@ -1,7 +1,9 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    net::{IpAddr, SocketAddr}, str::FromStr, time::{Duration, SystemTime}
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    time::{Duration, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -127,12 +129,12 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
             add_route(&ifname, addr)?;
 
             DeviceUpdate::new()
-                .set_keypair(KeyPair::from_private(
-                    Key::from_base64(&config.interface.private_key)?,
-                ))
+                .set_keypair(KeyPair::from_private(Key::from_base64(
+                    &config.interface.private_key,
+                )?))
                 .set_listen_port(listen_port)
                 .add_peers(&peers)
-            }
+        }
         None => {
             let device = Device::get(&ifname, Backend::default())?;
             DeviceUpdate::new().add_peers(
@@ -190,7 +192,7 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     let now = SystemTime::now();
-    log::trace!("{if_name} has {} peers" ,device.peers.len());
+    log::trace!("{if_name} has {} peers", device.peers.len());
 
     let mut inactive_peers = vec![];
     for peer in device.peers {
@@ -217,6 +219,6 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
             log::trace!("{msg} INACTIVE");
         }
     }
-    log::debug!("{if_name} has {} INACTIVE peers" ,inactive_peers.len());
+    log::debug!("{if_name} has {} INACTIVE peers", inactive_peers.len());
     Ok(inactive_peers)
 }
