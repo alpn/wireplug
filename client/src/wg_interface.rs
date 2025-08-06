@@ -135,12 +135,18 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
             }
         None => {
             let device = Device::get(&ifname, Backend::default())?;
-            let peers: Vec<_> = device.peers.iter().map(
-                |p| PeerConfigBuilder::new(&p.config.public_key)
-                .set_persistent_keepalive_interval(protocol::COMMON_PKA)).collect();
-            DeviceUpdate::new().add_peers(&peers)
-            }
-        };
+            DeviceUpdate::new().add_peers(
+                &device
+                    .peers
+                    .iter()
+                    .map(|p| {
+                        PeerConfigBuilder::new(&p.config.public_key)
+                            .set_persistent_keepalive_interval(protocol::COMMON_PKA)
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        }
+    };
 
     update.apply(&ifname, Backend::default())?;
 
