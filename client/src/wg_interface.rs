@@ -209,10 +209,9 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
                 ))
             {
                 inactive_peers.push(peer.config.public_key);
-                log::trace!("{msg} OK");
-            } else {
-                inactive_peers.push(peer.config.public_key);
                 log::trace!("{msg} INACTIVE");
+            } else {
+                log::trace!("{msg} OK");
             }
         } else {
             inactive_peers.push(peer.config.public_key);
