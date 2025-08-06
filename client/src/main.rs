@@ -66,23 +66,23 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
     }
 }
 
-fn start(ifname: &String, config: Option<String>, traverse_nat: bool) -> anyhow::Result<()> {
+fn start(ifname: &String, config_file: Option<String>, traverse_nat: bool) -> anyhow::Result<()> {
 
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");
     wg_interface::show_config(ifname)?;
 
-    if let Some(config_file) = config {
-        let config = config::read_from_file(&config_file)?;
-        wg_interface::configure(ifname, &config)?;
-        log::info!("interface configured");
-        wg_interface::show_config(ifname)?;
-        /*
-        log::info!("waiting for peers to attempt handshakes..");
-        std::thread::sleep(Duration::from_secs(shared::COMMON_PKA as u64 + 5));
-         */
-    }
+    let config = match config_file {
+        Some(path) => Some(config::read_from_file(&path)?),
+        None => None,
+    };
+
+    wg_interface::configure(ifname, config)?;
+    log::info!("interface configured");
+    wg_interface::show_config(ifname)?;
+    log::info!("waiting for peers to attempt handshakes..");
+    std::thread::sleep(Duration::from_secs(5));
     monitor_interface(ifname, traverse_nat)?;
     Ok(())
 }

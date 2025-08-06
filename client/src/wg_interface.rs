@@ -98,38 +98,51 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
-pub(crate) fn configure(ifname: &String, config: &Config) -> anyhow::Result<()> {
+pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Result<()> {
     log::trace!("configuring interface {ifname}..");
     let ifname: InterfaceName = ifname.parse()?;
 
-    let mut peers = vec![];
-    for peer in &config.peers {
-        let peer_config = PeerConfigBuilder::new(
-            &Key::from_base64(&peer.public_key)
-                .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
-        )
-        .set_persistent_keepalive_interval(protocol::COMMON_PKA)
-        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32);
-        peers.push(peer_config);
-    }
+    let update = match config {
+        Some(config) => {
+            let mut peers = vec![];
+            for peer in &config.peers {
+                let peer_config = PeerConfigBuilder::new(
+                    &Key::from_base64(&peer.public_key)
+                        .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
+                )
+                .set_persistent_keepalive_interval(protocol::COMMON_PKA)
+                .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32);
+                peers.push(peer_config);
+            }
 
-    let listen_port = match config.interface.listen_port {
-        Some(port) => port,
-        None => utils::get_random_port(),
-    };
+            let listen_port = match config.interface.listen_port {
+                Some(port) => port,
+                None => utils::get_random_port(),
+            };
 
-    let update = DeviceUpdate::new()
-        .set_keypair(KeyPair::from_private(
-            Key::from_base64(&config.interface.private_key)?,
-        ))
-        .set_listen_port(listen_port)
-        .add_peers(&peers);
+            let addr = IpNet::from_str(config.interface.address.as_str())
+                .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
+            set_addr(&ifname, addr)?;
+            #[cfg(target_os = "macos")]
+            add_route(&ifname, addr)?;
+
+            DeviceUpdate::new()
+                .set_keypair(KeyPair::from_private(
+                    Key::from_base64(&config.interface.private_key)?,
+                ))
+                .set_listen_port(listen_port)
+                .add_peers(&peers)
+            }
+        None => {
+            let device = Device::get(&ifname, Backend::default())?;
+            let peers: Vec<_> = device.peers.iter().map(
+                |p| PeerConfigBuilder::new(&p.config.public_key)
+                .set_persistent_keepalive_interval(protocol::COMMON_PKA)).collect();
+            DeviceUpdate::new().add_peers(&peers)
+            }
+        };
+
     update.apply(&ifname, Backend::default())?;
-    let addr = IpNet::from_str(config.interface.address.as_str())
-        .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-    set_addr(&ifname, addr)?;
-    #[cfg(target_os = "macos")]
-    add_route(&ifname, addr)?;
 
     Ok(())
 }
