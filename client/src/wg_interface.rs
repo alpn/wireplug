@@ -13,28 +13,27 @@ use wireguard_control::{
 use crate::{config::Config, utils};
 
 pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
-    println!("=========== if: {ifname} ===========");
+    log::trace!("=========== if: {ifname} ===========");
     let ifname: InterfaceName = ifname.parse()?;
     let dev = Device::get(&ifname, Backend::default())?;
     if let Some(public_key) = dev.public_key {
-        println!("public key: {}", public_key.to_base64());
+        log::trace!("public key: {}", public_key.to_base64());
     }
     if let Some(port) = dev.listen_port {
-        println!("listen port: {port}");
+        log::trace!("listen port: {port}");
     }
-    println!("peers:");
+    log::trace!("peers:");
     for peer in dev.peers {
-        println!("\tpublic key: {}", peer.config.public_key.to_base64());
+        log::trace!("\tpublic key: {}", peer.config.public_key.to_base64());
         if let Some(endpoint) = peer.config.endpoint {
-            println!("\tendpoint: {endpoint}");
+            log::trace!("\tendpoint: {endpoint}");
         }
-        println!("\tallowed IPs:");
+        log::trace!("\tallowed IPs:");
         for aip in peer.config.allowed_ips {
-            println!("\t\t{}/{}", aip.address, aip.cidr);
+            log::trace!("\t\t{}/{}", aip.address, aip.cidr);
         }
-        println!("\t---------------------------------");
+        log::trace!("\t---------------------------------");
     }
-    println!("\n\n");
 
     Ok(())
 }
@@ -57,6 +56,7 @@ pub fn set_addr(
     interface: &InterfaceName,
     addr: IpNet,
 ) -> Result<std::process::Output, std::io::Error> {
+    log::trace!("set_addr: {addr:?}");
     let output = cmd(
         "ifconfig",
         &[
@@ -67,7 +67,6 @@ pub fn set_addr(
             "alias",
         ],
     )?;
-    println!("set_addr: {output:?}");
     Ok(output)
 }
 
@@ -100,7 +99,7 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
 }
 
 pub(crate) fn configure(ifname: &String, config: &Config) -> anyhow::Result<()> {
-    println!("configuring interface {ifname}..");
+    log::trace!("configuring interface {ifname}..");
     let ifname: InterfaceName = ifname.parse()?;
 
     let mut peers = vec![];
@@ -140,7 +139,7 @@ pub(crate) fn update_peer(
     peer: &Key,
     new_endpoint: SocketAddr,
 ) -> Result<(), std::io::Error> {
-    println!(
+    log::trace!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),
         peer.to_base64(),
@@ -168,13 +167,15 @@ pub(crate) fn get_port(ifname: &String) -> Option<u16> {
 }
 
 pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
+    log::trace!("get_inactive_peers()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     let now = SystemTime::now();
+    log::trace!("{if_name} has {} peers" ,device.peers.len());
 
     let mut inactive_peers = vec![];
     for peer in device.peers {
-        print!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
+        let msg = format!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
         if let Some(last_handshake) = peer.stats.last_handshake_time {
             let duration = now
                 .duration_since(last_handshake)
@@ -187,14 +188,16 @@ pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::
                 ))
             {
                 inactive_peers.push(peer.config.public_key);
-                println!("INACTIVE");
+                log::trace!("{msg} OK");
             } else {
-                println!("OK");
+                inactive_peers.push(peer.config.public_key);
+                log::trace!("{msg} INACTIVE");
             }
         } else {
             inactive_peers.push(peer.config.public_key);
-            println!("INACTIVE");
+            log::trace!("{msg} INACTIVE");
         }
     }
+    log::debug!("{if_name} has {} INACTIVE peers" ,inactive_peers.len());
     Ok(inactive_peers)
 }

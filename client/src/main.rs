@@ -23,26 +23,28 @@ struct Cli {
 
 fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new();
+    log::info!("monitoring interface: {ifname} with NAT travesal={traverse_nat}");
     loop {
         let Some(listen_port) = wg_interface::get_port(ifname) else {
             todo!();
         };
         let inactive_peers = wg_interface::get_inactive_peers(ifname)?;
         if !inactive_peers.is_empty() {
+            log::info!("inactive peers found");
             let port_to_announce = if netmon.has_changed() && traverse_nat {
                 let new_listen_port = utils::get_random_port();
                 let nat = nat::detect_kind(new_listen_port)?;
-                println!("NAT: {nat:?}");
+                log::debug!("NAT: {nat:?}");
                 let observed_port = match nat {
                     nat::NatKind::Easy => new_listen_port,
                     nat::NatKind::FixedPortMapping(port_mapping_nat) => port_mapping_nat.obsereved_port,
                     nat::NatKind::Hard => {
-                        println!("can't do much about Hard NAT atm, will try again in a bit .. ");
+                        log::warn!("can't do much about Hard NAT atm, will try again in a bit .. ");
                         thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
                         continue;
                     }
                 };
-                println!("updating listen port to {new_listen_port} ..");
+                log::debug!("updating listen port to {new_listen_port} ..");
                 std::thread::sleep(Duration::from_secs(3));
                 wg_interface::update_port(ifname, new_listen_port)?;
                 observed_port
@@ -56,7 +58,7 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
                 port_to_announce,
                 lan_addrs,
             )? {
-                println!("waiting for peers to attempt handshakes..");
+                log::info!("some endpoints were updated, waiting for peers to attempt handshakes..");
                 thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
             }
         }
@@ -68,14 +70,16 @@ fn start(ifname: &String, config: Option<String>, traverse_nat: bool) -> anyhow:
 
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
+    log::info!("starting");
     wg_interface::show_config(ifname)?;
 
     if let Some(config_file) = config {
         let config = config::read_from_file(&config_file)?;
         wg_interface::configure(ifname, &config)?;
+        log::info!("interface configured");
         wg_interface::show_config(ifname)?;
         /*
-        println!("waiting for peers to attempt handshakes..");
+        log::info!("waiting for peers to attempt handshakes..");
         std::thread::sleep(Duration::from_secs(shared::COMMON_PKA as u64 + 5));
          */
     }

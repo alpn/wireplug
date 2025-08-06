@@ -249,6 +249,7 @@ dependencies = [
  "clap",
  "getifaddrs",
  "ipnet",
+ "log",
  "publicip",
  "rand",
  "rustls",

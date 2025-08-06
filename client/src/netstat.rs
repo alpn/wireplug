@@ -34,7 +34,7 @@ impl NetworkMonitor {
         if new_info == self.info {
             return false;
         }
-        println!("network status has change! {:?} vs {:?}" ,self.info, new_info);
+        log::debug!("network status has change! {:?} vs {:?}" ,self.info, new_info);
         self.info = new_info;
         true
     }
