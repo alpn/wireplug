@@ -1,4 +1,5 @@
 use clap::Parser;
+use shared::TmpLogger;
 use std::{thread, time::Duration};
 
 pub mod announce;
@@ -7,6 +8,8 @@ pub mod nat;
 pub mod utils;
 pub mod wg_interface;
 pub mod netstat;
+
+static LOGGER : TmpLogger = TmpLogger;
 
 #[derive(Parser)]
 #[command(version, name="Wireplug", about="", long_about = None)]
@@ -63,6 +66,8 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
 
 fn start(ifname: &String, config: Option<String>, traverse_nat: bool) -> anyhow::Result<()> {
 
+    log::set_max_level(log::LevelFilter::Trace);
+    log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     wg_interface::show_config(ifname)?;
 
     if let Some(config_file) = config {
