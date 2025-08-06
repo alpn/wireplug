@@ -1,9 +1,7 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-    time::{Duration, SystemTime},
+    net::{IpAddr, SocketAddr}, str::FromStr, time::{Duration, SystemTime}
 };
 
 use ipnet::IpNet;
@@ -122,9 +120,9 @@ pub(crate) fn configure(ifname: &String, config: &Config) -> anyhow::Result<()> 
     };
 
     let update = DeviceUpdate::new()
-        .set_keypair(KeyPair::from_private(Key::from_base64(
-            &config.interface.private_key,
-        )?))
+        .set_keypair(KeyPair::from_private(
+            Key::from_base64(&config.interface.private_key)?,
+        ))
         .set_listen_port(listen_port)
         .add_peers(&peers);
     update.apply(&ifname, Backend::default())?;

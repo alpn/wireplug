@@ -19,7 +19,7 @@ impl PortMappingNat {
 #[derive(Debug)]
 pub(crate) enum NatKind {
     Easy,
-    Manageable(PortMappingNat),
+    FixedPortMapping(PortMappingNat),
     Hard,
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
         ) => {
             if port1 == port2 {
                 let observed_port = port1;
-                NatKind::Manageable(PortMappingNat::new(local_port, observed_port))
+                NatKind::FixedPortMapping(PortMappingNat::new(local_port, observed_port))
             } else {
                 NatKind::Hard
             }
