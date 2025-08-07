@@ -137,11 +137,10 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
 }
 
 pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Result<()> {
-    log::trace!("configuring interface {ifname}..");
     let ifname: InterfaceName = ifname.parse()?;
-
     let update = match config {
         Some(config) => {
+            log::debug!("{ifname}: configuring using config file");
             let mut peers = vec![];
             for peer in &config.peers {
                 let peer_config = PeerConfigBuilder::new(
@@ -186,6 +185,7 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
         }
     };
 
+    log::debug!("{ifname}: setting wgpka={} on all peers", protocol::COMMON_PKA);
     update.apply(&ifname, Backend::default())?;
 
     Ok(())
