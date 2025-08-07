@@ -5,7 +5,7 @@ use std::{
 };
 
 use ipnet::IpNet;
-use shared::protocol;
+use shared::protocol::{self, WireplugResponse};
 use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
@@ -186,7 +186,7 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
     Ok(())
 }
 
-pub(crate) fn update_peer(
+fn update_peer(
     iface: &InterfaceName,
     peer: &Key,
     new_endpoint: SocketAddr,
@@ -203,6 +203,43 @@ pub(crate) fn update_peer(
     update.apply(iface, Backend::default())?;
 
     Ok(())
+}
+
+pub(crate) fn update_peers(
+    if_name: &String,
+    response: WireplugResponse
+) -> Result<bool, std::io::Error> {
+
+    let iface = if_name.parse()?;
+    let mut updated_some = false;
+    for (peer, peer_endpoint) in response.peer_endpoints {
+        let Ok(peer_pubkey) = Key::from_base64(&peer) else {
+            log::error!("bad peer pubkey");
+            continue;
+        };
+        match peer_endpoint {
+            protocol::WireplugEndpoint::Unknown => log::debug!("wireplug.org: {peer} is unknown"),
+            protocol::WireplugEndpoint::LocalNetwork {
+                lan_addrs,
+                listen_port,
+            } => {
+                if let Some(addr) = lan_addrs.get(0) {
+                    log::debug!("wireplug.org: {peer} is on our local network @{addr}");
+                    let ipnet = IpNet::from_str(&addr.as_str())
+                        .map_err(|e| std::io::Error::other(format!("{e}")))?;
+                    let addr = SocketAddr::new(ipnet.addr(), listen_port);
+                    update_peer(&iface, &peer_pubkey, addr)?;
+                    updated_some = true;
+                }
+            }
+            protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
+                log::debug!("wireplug.org: {peer} is @{wan_addr}");
+                update_peer(&iface, &peer_pubkey, wan_addr)?;
+                updated_some = true;
+            }
+        }
+    }
+    Ok(updated_some)
 }
 
 pub(crate) fn update_port(ifname: &String, new_port: u16) -> Result<(), std::io::Error> {

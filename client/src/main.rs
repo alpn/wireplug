@@ -55,17 +55,28 @@ fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> 
                 listen_port
             };
             let lan_addrs = utils::get_lan_addrs(ifname).ok();
-            if announce::announce_and_update_peers(
+            match announce::announce(
                 ifname,
                 inactive_peers,
                 port_to_announce,
                 lan_addrs,
-            )? {
-                log::info!(
-                    "some endpoints were updated, waiting for peers to attempt handshakes.."
-                );
-                thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
+            ){
+                Ok(response) => {
+                    if wg_interface::update_peers(ifname, response)? {
+                        log::info!(
+                            "some endpoints were updated, waiting for peers to attempt handshakes.."
+                        );
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "announcement failed: {e}"
+                    );
+                    thread::sleep(Duration::from_secs(5));
+                    continue;
+                },
             }
+            thread::sleep(Duration::from_secs(shared::protocol::POST_UPDATE_INTERVAL));
         }
         thread::sleep(Duration::from_secs(shared::protocol::MONITORING_INTERVAL));
     }
