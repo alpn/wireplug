@@ -1,7 +1,11 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    collections::HashMap, net::{IpAddr, SocketAddr}, str::FromStr, thread, time::{Duration, SystemTime}
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    thread,
+    time::{Duration, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -208,9 +212,8 @@ fn update_peer(
 
 pub(crate) fn update_peers(
     if_name: &String,
-    response: WireplugResponse
+    response: WireplugResponse,
 ) -> Result<bool, std::io::Error> {
-
     let iface = if_name.parse()?;
     let mut updated_some = false;
     for (peer, peer_endpoint) in response.peer_endpoints {
@@ -263,12 +266,11 @@ pub(crate) fn init_peers_activity(
     log::trace!("init_peers_activity()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
-    device
-        .peers
-        .iter()
-        .for_each(|p| {let _ = peers_activity.update(p); ()});
+    device.peers.iter().for_each(|p| {
+        let _ = peers_activity.update(p);
+        ()
+    });
     Ok(())
-
 }
 
 pub(crate) fn get_inactive_peers(

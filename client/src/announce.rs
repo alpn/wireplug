@@ -1,4 +1,7 @@
-use shared::{self, protocol::{self, WireplugResponse}, BINCODE_CONFIG, WP_WIREPLUG_ORG};
+use shared::{
+    self, BINCODE_CONFIG, WP_WIREPLUG_ORG,
+    protocol::{self, WireplugResponse},
+};
 use std::{
     io::{Read, Write},
     net::TcpStream,

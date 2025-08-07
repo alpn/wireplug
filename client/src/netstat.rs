@@ -39,7 +39,7 @@ impl NetworkMonitor {
         if new_info == self.info {
             return false;
         }
-        log::debug!("netstat: {:?}" ,new_info);
+        log::debug!("netstat: {:?}", new_info);
 
         self.info = new_info;
         true

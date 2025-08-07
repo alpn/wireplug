@@ -4,11 +4,11 @@ use std::time::Duration;
 
 mod announce;
 mod config;
+mod daemon;
 mod nat;
 mod netstat;
 mod utils;
 mod wg_interface;
-mod daemon;
 
 static LOGGER: TmpLogger = TmpLogger;
 

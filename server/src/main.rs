@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-use shared::{protocol, TmpLogger, BINCODE_CONFIG};
+use shared::{BINCODE_CONFIG, TmpLogger, protocol};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, RwLock};
@@ -38,7 +38,7 @@ struct Record {
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
-static LOGGER : TmpLogger = TmpLogger;
+static LOGGER: TmpLogger = TmpLogger;
 
 async fn handle_connection<S>(
     mut stream: S,
