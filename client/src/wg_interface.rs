@@ -24,18 +24,19 @@ impl PeersActivity {
     }
 
     fn update(&mut self, peer: &PeerInfo) -> bool {
+        let new_rx = peer.stats.rx_bytes;
         let msg = format!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
         match self.activity.get_mut(&peer.config.public_key) {
             Some(prev_rx) => {
-                if peer.stats.rx_bytes > *prev_rx {
-                    *prev_rx = peer.stats.rx_bytes;
+                if new_rx > *prev_rx {
+                    *prev_rx = new_rx;
                     log::trace!("{msg} OK");
                     return true;
                 }
             }
             None => {
                 self.activity
-                    .insert(peer.config.public_key.to_owned(), 0);
+                    .insert(peer.config.public_key.to_owned(), new_rx);
                 log::trace!("{msg} NEW");
                 return true;
             }
