@@ -1,18 +1,49 @@
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-    time::{Duration, SystemTime},
+    collections::HashMap, net::{IpAddr, SocketAddr}, str::FromStr, thread, time::{Duration, SystemTime}
 };
 
 use ipnet::IpNet;
 use shared::protocol;
 use wireguard_control::{
-    Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder,
+    Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
 use crate::{config::Config, utils};
+
+pub struct PeersActivity {
+    activity: HashMap<Key, u64>,
+}
+
+impl PeersActivity {
+    pub fn new() -> Self {
+        Self {
+            activity: HashMap::new(),
+        }
+    }
+
+    fn update(&mut self, peer: &PeerInfo) -> bool {
+        let msg = format!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
+        match self.activity.get_mut(&peer.config.public_key) {
+            Some(prev_rx) => {
+                if peer.stats.rx_bytes > *prev_rx {
+                    *prev_rx = peer.stats.rx_bytes;
+                    log::trace!("{msg} OK");
+                    return true;
+                }
+            }
+            None => {
+                self.activity
+                    .insert(peer.config.public_key.to_owned(), 0);
+                log::trace!("{msg} NEW");
+                return true;
+            }
+        }
+        log::trace!("{msg} INACTIVE");
+        false
+    }
+}
 
 pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     log::trace!("=========== if: {ifname} ===========");
@@ -187,37 +218,18 @@ pub(crate) fn get_port(ifname: &String) -> Option<u16> {
     dev.listen_port
 }
 
-pub(crate) fn get_inactive_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
+pub(crate) fn get_inactive_peers(
+    if_name: &String,
+    peers_activity: &mut PeersActivity,
+) -> Result<Vec<Key>, std::io::Error> {
     log::trace!("get_inactive_peers()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
-    let now = SystemTime::now();
     log::trace!("{if_name} has {} peers", device.peers.len());
-
-    let mut inactive_peers = vec![];
-    for peer in device.peers {
-        let msg = format!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
-        if let Some(last_handshake) = peer.stats.last_handshake_time {
-            let duration = now
-                .duration_since(last_handshake)
-                .map_err(|e| std::io::Error::other(format!("{e}")))?;
-
-            if duration
-                > Duration::from_secs(std::cmp::max(
-                    peer.config.persistent_keepalive_interval.unwrap_or(0) as u64,
-                    protocol::LAST_HANDSHAKE_MAX,
-                ))
-            {
-                inactive_peers.push(peer.config.public_key);
-                log::trace!("{msg} INACTIVE");
-            } else {
-                log::trace!("{msg} OK");
-            }
-        } else {
-            inactive_peers.push(peer.config.public_key);
-            log::trace!("{msg} INACTIVE");
-        }
-    }
-    log::debug!("{if_name} has {} INACTIVE peers", inactive_peers.len());
-    Ok(inactive_peers)
+    Ok(device
+        .peers
+        .iter()
+        .filter(|p| !peers_activity.update(p))
+        .map(|p| p.config.public_key.to_owned())
+        .collect::<Vec<_>>())
 }

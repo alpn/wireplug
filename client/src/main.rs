@@ -22,15 +22,16 @@ struct Cli {
 }
 
 fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
+    let mut peers_activity = wg_interface::PeersActivity::new();
     let mut netmon = netstat::NetworkMonitor::new();
     log::info!("monitoring interface: {ifname} with NAT travesal={traverse_nat}");
     loop {
         let Some(listen_port) = wg_interface::get_port(ifname) else {
             todo!();
         };
-        let inactive_peers = wg_interface::get_inactive_peers(ifname)?;
+        let inactive_peers = wg_interface::get_inactive_peers(ifname, &mut peers_activity)?;
         if !inactive_peers.is_empty() {
-            log::info!("inactive peers found");
+            log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
             let port_to_announce = if netmon.has_changed() && traverse_nat {
                 let new_listen_port = utils::get_random_port();
                 let nat = nat::detect_kind(new_listen_port)?;

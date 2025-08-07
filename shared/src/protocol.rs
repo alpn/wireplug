@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
 
-pub const MONITORING_INTERVAL: u64 = 30;
+pub const MONITORING_INTERVAL: u64 = 180;
 pub const POST_UPDATE_INTERVAL: u64 = 60;
 pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
