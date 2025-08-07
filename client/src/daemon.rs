@@ -60,16 +60,18 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     loop {
         let listen_port = wg_interface::get_port(ifname).context("listen port is not set")?;
         let inactive_peers = wg_interface::get_inactive_peers(ifname, &mut peers_activity)?;
-        log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
         let seconds_to_wait = match inactive_peers.is_empty() {
-            false => handle_inactive_peers(
-                ifname,
-                inactive_peers,
-                &mut netmon,
-                listen_port,
-                traverse_nat,
-            )?,
             true => shared::protocol::MONITORING_INTERVAL,
+            false => {
+                log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
+                handle_inactive_peers(
+                    ifname,
+                    inactive_peers,
+                    &mut netmon,
+                    listen_port,
+                    traverse_nat,
+                )?
+            }
         };
         thread::sleep(Duration::from_secs(seconds_to_wait));
     }
