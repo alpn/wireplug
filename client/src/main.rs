@@ -2,12 +2,12 @@ use clap::Parser;
 use shared::TmpLogger;
 use std::{thread, time::Duration};
 
-pub mod announce;
-pub mod config;
-pub mod nat;
-pub mod netstat;
-pub mod utils;
-pub mod wg_interface;
+mod announce;
+mod config;
+mod nat;
+mod netstat;
+mod utils;
+mod wg_interface;
 
 static LOGGER: TmpLogger = TmpLogger;
 
