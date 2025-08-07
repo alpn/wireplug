@@ -39,9 +39,8 @@ impl NetworkMonitor {
         if new_info == self.info {
             return false;
         }
-        log::debug!("network status has change!");
-        log::trace!("from: {:?}", self.info);
-        log::trace!("to: {:?}", new_info);
+        log::debug!("netstat: {:?}" ,new_info);
+
         self.info = new_info;
         true
     }
