@@ -54,11 +54,10 @@ pub(crate) fn handle_inactive_peers(ifname: &String, peers: Vec<Key>, netmon: &m
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut peers_activity = wg_interface::PeersActivity::new();
     let mut netmon = netstat::NetworkMonitor::new();
+    wg_interface::init_peers_activity(ifname, &mut peers_activity)?;
     log::info!("monitoring interface: {ifname} with NAT travesal={traverse_nat}");
     loop {
-        let Some(listen_port) = wg_interface::get_port(ifname) else {
-            todo!();
-        };
+        let listen_port= wg_interface::get_port(ifname).context("listen port is not set")?;
         let inactive_peers = wg_interface::get_inactive_peers(ifname, &mut peers_activity)?;
         log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
         let seconds_to_wait = match  inactive_peers.is_empty() {

@@ -256,6 +256,21 @@ pub(crate) fn get_port(ifname: &String) -> Option<u16> {
     dev.listen_port
 }
 
+pub(crate) fn init_peers_activity(
+    if_name: &String,
+    peers_activity: &mut PeersActivity,
+) -> Result<(), std::io::Error> {
+    log::trace!("init_peers_activity()");
+    let iface = if_name.parse()?;
+    let device = Device::get(&iface, Backend::default())?;
+    device
+        .peers
+        .iter()
+        .for_each(|p| {let _ = peers_activity.update(p); ()});
+    Ok(())
+
+}
+
 pub(crate) fn get_inactive_peers(
     if_name: &String,
     peers_activity: &mut PeersActivity,
