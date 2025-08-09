@@ -288,3 +288,15 @@ pub(crate) fn get_inactive_peers(
         .map(|p| p.config.public_key.to_owned())
         .collect::<Vec<_>>())
 }
+
+pub(crate) fn get_all_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
+    log::trace!("get_all_peers()");
+    let iface = if_name.parse()?;
+    let device = Device::get(&iface, Backend::default())?;
+    log::trace!("{if_name} has {} peers", device.peers.len());
+    Ok(device
+        .peers
+        .iter()
+        .map(|p| p.config.public_key.to_owned())
+        .collect::<Vec<_>>())
+}
