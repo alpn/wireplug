@@ -46,9 +46,9 @@ fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
 
 pub(crate) fn announce(
     if_name: &String,
-    peers: Vec<Key>,
+    peers: &Vec<Key>,
     announcement_port: u16,
-    lan_addrs: Option<Vec<String>>,
+    lan_addrs: &Option<Vec<String>>,
 ) -> Result<WireplugResponse, std::io::Error> {
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
