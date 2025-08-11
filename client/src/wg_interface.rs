@@ -5,7 +5,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     str::FromStr,
     thread,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -73,6 +73,24 @@ pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
         log::trace!("\t---------------------------------");
     }
 
+    Ok(())
+}
+
+pub(crate) fn show_peers(ifname: &String) -> anyhow::Result<()> {
+    let ifname: InterfaceName = ifname.parse()?;
+    let dev = Device::get(&ifname, Backend::default())?;
+    log::debug!("peers:");
+    let now = SystemTime::now();
+    for peer in dev.peers {
+        let last_handshake = match peer.stats.last_handshake_time {
+            Some(last_handshake_time) => now
+                .duration_since(last_handshake_time)?
+                .as_secs()
+                .to_string(),
+            None => "NA".to_string(),
+        };
+        log::debug!("\t{} last handshake: {last_handshake}", peer.config.public_key.to_base64());
+    }
     Ok(())
 }
 
