@@ -152,11 +152,6 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
                 peers.push(peer_config);
             }
 
-            let listen_port = match config.interface.listen_port {
-                Some(port) => port,
-                None => utils::get_random_port(),
-            };
-
             let addr = IpNet::from_str(config.interface.address.as_str())
                 .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
             set_addr(&ifname, addr)?;
@@ -167,7 +162,6 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
                 .set_keypair(KeyPair::from_private(Key::from_base64(
                     &config.interface.private_key,
                 )?))
-                .set_listen_port(listen_port)
                 .add_peers(&peers)
         }
         None => {

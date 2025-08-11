@@ -36,8 +36,6 @@ fn start(ifname: &String, config_file: Option<String>, traverse_nat: bool) -> an
     wg_interface::configure(ifname, config)?;
     log::info!("interface configured");
     wg_interface::show_config(ifname)?;
-    log::info!("waiting for peers to attempt handshakes..");
-    std::thread::sleep(Duration::from_secs(5));
     daemon::monitor_interface(ifname, traverse_nat)?;
     Ok(())
 }
