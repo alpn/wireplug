@@ -197,7 +197,10 @@ pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Resu
         }
     };
 
-    log::debug!("{ifname}: setting wgpka={} on all peers", protocol::COMMON_PKA);
+    log::debug!(
+        "{ifname}: setting wgpka={} on all peers",
+        protocol::COMMON_PKA
+    );
     update.apply(&ifname, Backend::default())?;
 
     Ok(())
@@ -225,9 +228,9 @@ fn update_peer(
 pub(crate) fn update_peers(
     if_name: &String,
     response: WireplugResponse,
-) -> Result<bool, std::io::Error> {
+) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
-    let mut updated_some = false;
+    let mut peers_updated = vec![];
     for (peer, peer_endpoint) in response.peer_endpoints {
         let Ok(peer_pubkey) = Key::from_base64(&peer) else {
             log::error!("bad peer pubkey");
@@ -245,17 +248,17 @@ pub(crate) fn update_peers(
                         .map_err(|e| std::io::Error::other(format!("{e}")))?;
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
                     update_peer(&iface, &peer_pubkey, addr)?;
-                    updated_some = true;
+                    peers_updated.push(peer_pubkey);
                 }
             }
             protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 log::debug!("wireplug.org: {peer} is @{wan_addr}");
                 update_peer(&iface, &peer_pubkey, wan_addr)?;
-                updated_some = true;
+                peers_updated.push(peer_pubkey);
             }
         }
     }
-    Ok(updated_some)
+    Ok(peers_updated)
 }
 
 pub(crate) fn update_port(ifname: &String, new_port: u16) -> Result<(), std::io::Error> {
