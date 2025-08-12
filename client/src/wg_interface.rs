@@ -89,7 +89,10 @@ pub(crate) fn show_peers(ifname: &String) -> anyhow::Result<()> {
                 .to_string(),
             None => "NA".to_string(),
         };
-        log::debug!("\t{} last handshake: {last_handshake}", peer.config.public_key.to_base64());
+        log::debug!(
+            "\t{} last handshake: {last_handshake}",
+            peer.config.public_key.to_base64()
+        );
     }
     Ok(())
 }
@@ -288,18 +291,41 @@ pub(crate) fn init_peers_activity(
     Ok(())
 }
 
-pub(crate) fn get_inactive_peers(
+pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &String) -> anyhow::Result<Vec<Key>> {
+    log::trace!("get_inactive_peers_by_handshake()");
+    let iface = if_name.parse()?;
+    let device = Device::get(&iface, Backend::default())?;
+    log::trace!("{if_name} has {} peers", device.peers.len());
+    let now = SystemTime::now();
+    Ok(device
+        .peers
+        .iter()
+        .filter(|p| match p.stats.last_handshake_time {
+            Some(last_handshake) => match now.duration_since(last_handshake) {
+                Ok(duration) => duration > Duration::from_secs(protocol::LAST_HANDSHAKE_MAX),
+                Err(e) => {
+                    log::warn!("failed to get duration since last handshake ({e})");
+                    true
+                }
+            },
+            None => true,
+        })
+        .map(|p| p.config.public_key.to_owned())
+        .collect::<Vec<_>>())
+}
+
+pub(crate) fn get_inactive_peers_by_txrx(
     if_name: &String,
     peers_activity: &mut PeersActivity,
 ) -> Result<Vec<Key>, std::io::Error> {
-    log::trace!("get_inactive_peers()");
+    log::trace!("get_inactive_peers_by_txrx()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     log::trace!("{if_name} has {} peers", device.peers.len());
     Ok(device
         .peers
         .iter()
-        .filter(|p| !peers_activity.update(p))
+        .filter(|p| p.stats.last_handshake_time.is_none() || !peers_activity.update(p))
         .map(|p| p.config.public_key.to_owned())
         .collect::<Vec<_>>())
 }
