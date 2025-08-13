@@ -1,6 +1,6 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use log::Level;
 use shared::TmpLogger;
-use std::time::Duration;
 
 mod announce;
 mod config;
@@ -12,6 +12,12 @@ mod wg_interface;
 
 static LOGGER: TmpLogger = TmpLogger;
 
+#[derive(Clone, Debug, ValueEnum)]
+enum LogLevelPicker {
+    Default,
+    Medium,
+    High,
+}
 #[derive(Parser)]
 #[command(version, name="Wireplug", about="", long_about = None)]
 struct Cli {
@@ -20,10 +26,12 @@ struct Cli {
     config: Option<String>,
     #[arg(long)]
     no_nat: bool,
+    #[arg(short, long)]
+    log_level: Option<LogLevelPicker>,
 }
 
-fn start(ifname: &String, config_file: Option<String>, traverse_nat: bool) -> anyhow::Result<()> {
-    log::set_max_level(log::LevelFilter::Trace);
+fn start(ifname: &String, config_file: Option<String>, log_level: Level, traverse_nat: bool) -> anyhow::Result<()> {
+    log::set_max_level(log_level.to_level_filter());
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");
     wg_interface::show_config(ifname)?;
@@ -44,7 +52,16 @@ fn main() {
     let cli = Cli::parse();
     let ifname = &cli.interface_name;
     let traverse_nat = !cli.no_nat;
-    if let Err(e) = start(ifname, cli.config, traverse_nat) {
+    let log_level = match cli.log_level {
+        Some(level) => match level {
+            LogLevelPicker::Default => Level::Info,
+            LogLevelPicker::Medium => Level::Debug,
+            LogLevelPicker::High => Level::Trace,
+        },
+        None => Level::Info,
+     };
+
+    if let Err(e) = start(ifname, cli.config, log_level, traverse_nat) {
         eprintln!("fatal: {e}");
         std::process::exit(1);
     }
