@@ -96,17 +96,12 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         if Instant::now() > next_inactivity_check {
             next_inactivity_check += peer_is_inactive_duration;
             inactive_peers.clear();
-            //inactive_peers = wg_interface::get_inactive_peers_by_handshake(ifname)?;
             inactive_peers = wg_interface::get_inactive_peers_by_txrx(ifname, &mut peers_activity)?;
         }
         if inactive_peers.len() > 0 {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
             let port_to_announce = wg_interface::get_port(ifname).context("listen port is not set")?;
             handle_inactive_peers(ifname, &mut inactive_peers, port_to_announce)?;
-            if inactive_peers.len() > 0 {
-                next_inactivity_check = Instant::now() + Duration::from_secs(5);
-                continue;
-            }
         } else {
             wg_interface::show_peers(ifname)?;
         }
