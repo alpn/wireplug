@@ -720,7 +720,6 @@ dependencies = [
 [[package]]
 name = "publicip"
 version = "0.1.0"
-source = "git+https://github.com/tonarino/innernet.git#5912c14c1a40312ef4d4aee966ad19bbd8552375"
 
 [[package]]
 name = "quote"

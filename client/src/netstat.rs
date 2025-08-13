@@ -1,6 +1,4 @@
-use std::{
-    net::{Ipv4Addr, Ipv6Addr},
-};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct NetInfo {
