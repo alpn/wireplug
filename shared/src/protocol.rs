@@ -7,7 +7,7 @@ pub const MONITORING_INTERVAL: u64 = 180;
 pub const POST_UPDATE_INTERVAL: u64 = 60;
 pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
-pub const LAST_HANDSHAKE_MAX: u64 = 200;
+pub const LAST_HANDSHAKE_MAX: u64 = 180;
 
 fn is_valid_wgkey(s: &String) -> bool {
     if s.len() != 44 {
