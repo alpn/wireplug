@@ -4,8 +4,7 @@ use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
     str::FromStr,
-    thread,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, SystemTime},
 };
 
 use ipnet::IpNet;
@@ -14,7 +13,7 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::{config::Config, utils};
+use crate::config::Config;
 
 pub struct PeersActivity {
     activity: HashMap<Key, u64>,
@@ -245,9 +244,9 @@ pub(crate) fn update_peers(
                 lan_addrs,
                 listen_port,
             } => {
-                if let Some(addr) = lan_addrs.get(0) {
+                if let Some(addr) = lan_addrs.first() {
                     log::debug!("wireplug.org: {peer} is on our local network @{addr}");
-                    let ipnet = IpNet::from_str(&addr.as_str())
+                    let ipnet = IpNet::from_str(addr.as_str())
                         .map_err(|e| std::io::Error::other(format!("{e}")))?;
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
                     update_peer(&iface, &peer_pubkey, addr)?;
@@ -286,7 +285,7 @@ pub(crate) fn init_peers_activity(
     let device = Device::get(&iface, Backend::default())?;
     device.peers.iter().for_each(|p| {
         let _ = peers_activity.update(p);
-        ()
+        
     });
     Ok(())
 }

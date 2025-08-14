@@ -19,10 +19,10 @@ pub(crate) fn handle_inactive_peers(
 ) -> anyhow::Result<()> {
     let lan_addrs = utils::get_lan_addrs(ifname).ok();
     for _ in 1..=3 {
-        match announce::announce(ifname, &peers, port_to_announce, &lan_addrs) {
+        match announce::announce(ifname, peers, port_to_announce, &lan_addrs) {
             Ok(response) => {
                 let peers_updated = wg_interface::update_peers(ifname, response)?;
-                if peers_updated.len() > 0 {
+                if !peers_updated.is_empty() {
                     log::info!(
                         "some endpoints were updated, waiting for peers to attempt handshakes.."
                     );
@@ -52,7 +52,8 @@ fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
         };
 
         log::debug!("NAT: {nat:?}");
-        let observed_port = match nat {
+        
+        match nat {
             nat::NatKind::Easy => Some(new_port),
             nat::NatKind::FixedPortMapping(port_mapping_nat) => {
                 Some(port_mapping_nat.obsereved_port)
@@ -62,12 +63,11 @@ fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
                 log::warn!("NAT traversal failed");
                 None
             }
-        };
-        observed_port
+        }
     } else {
         Some(new_port)
     };
-    return new_listen_port;
+    new_listen_port
 }
 
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
@@ -106,7 +106,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             inactive_peers.clear();
             inactive_peers = wg_interface::get_inactive_peers_by_txrx(ifname, &mut peers_activity)?;
         }
-        if inactive_peers.len() > 0 {
+        if !inactive_peers.is_empty() {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
             let port_to_announce =
                 wg_interface::get_port(ifname).context("listen port is not set")?;
