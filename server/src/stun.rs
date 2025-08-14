@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use shared::{BINCODE_CONFIG, protocol};
 use tokio::{net::UdpSocket, sync::Mutex};

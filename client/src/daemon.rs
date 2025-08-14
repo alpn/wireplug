@@ -42,7 +42,7 @@ pub(crate) fn handle_inactive_peers(
 
 fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
     let new_port = utils::get_random_port();
-    let new_listen_port = if traverse_nat {
+    if traverse_nat {
         let nat = match nat::detect_kind(new_port) {
             Ok(nat) => nat,
             Err(e) => {
@@ -52,7 +52,7 @@ fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
         };
 
         log::debug!("NAT: {nat:?}");
-        
+
         match nat {
             nat::NatKind::Easy => Some(new_port),
             nat::NatKind::FixedPortMapping(port_mapping_nat) => {
@@ -66,8 +66,7 @@ fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
         }
     } else {
         Some(new_port)
-    };
-    new_listen_port
+    }
 }
 
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {

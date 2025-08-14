@@ -49,7 +49,7 @@ impl PeersActivity {
     }
 }
 
-pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
+pub(crate) fn show_config(ifname: &str) -> Result<(), std::io::Error> {
     log::trace!("=========== if: {ifname} ===========");
     let ifname: InterfaceName = ifname.parse()?;
     let dev = Device::get(&ifname, Backend::default())?;
@@ -75,7 +75,7 @@ pub(crate) fn show_config(ifname: &String) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub(crate) fn show_peers(ifname: &String) -> anyhow::Result<()> {
+pub(crate) fn show_peers(ifname: &str) -> anyhow::Result<()> {
     let ifname: InterfaceName = ifname.parse()?;
     let dev = Device::get(&ifname, Backend::default())?;
     log::debug!("peers:");
@@ -156,7 +156,7 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
-pub(crate) fn configure(ifname: &String, config: Option<Config>) -> anyhow::Result<()> {
+pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<()> {
     let ifname: InterfaceName = ifname.parse()?;
     let update = match config {
         Some(config) => {
@@ -228,7 +228,7 @@ fn update_peer(
 }
 
 pub(crate) fn update_peers(
-    if_name: &String,
+    if_name: &str,
     response: WireplugResponse,
 ) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
@@ -263,21 +263,21 @@ pub(crate) fn update_peers(
     Ok(peers_updated)
 }
 
-pub(crate) fn update_port(ifname: &String, new_port: u16) -> Result<(), std::io::Error> {
+pub(crate) fn update_port(ifname: &str, new_port: u16) -> Result<(), std::io::Error> {
     let iface: InterfaceName = ifname.parse()?;
     let update = DeviceUpdate::new().set_listen_port(new_port);
     update.apply(&iface, Backend::default())?;
     Ok(())
 }
 
-pub(crate) fn get_port(ifname: &String) -> Option<u16> {
+pub(crate) fn get_port(ifname: &str) -> Option<u16> {
     let ifname: InterfaceName = ifname.parse().ok()?;
     let dev = Device::get(&ifname, Backend::default()).ok()?;
     dev.listen_port
 }
 
 pub(crate) fn init_peers_activity(
-    if_name: &String,
+    if_name: &str,
     peers_activity: &mut PeersActivity,
 ) -> Result<(), std::io::Error> {
     log::trace!("init_peers_activity()");
@@ -285,12 +285,12 @@ pub(crate) fn init_peers_activity(
     let device = Device::get(&iface, Backend::default())?;
     device.peers.iter().for_each(|p| {
         let _ = peers_activity.update(p);
-        
     });
     Ok(())
 }
 
-pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &String) -> anyhow::Result<Vec<Key>> {
+#[allow(dead_code)]
+pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &str) -> anyhow::Result<Vec<Key>> {
     log::trace!("get_inactive_peers_by_handshake()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
@@ -314,7 +314,7 @@ pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &String) -> anyhow::
 }
 
 pub(crate) fn get_inactive_peers_by_txrx(
-    if_name: &String,
+    if_name: &str,
     peers_activity: &mut PeersActivity,
 ) -> Result<Vec<Key>, std::io::Error> {
     log::trace!("get_inactive_peers_by_txrx()");
@@ -329,7 +329,7 @@ pub(crate) fn get_inactive_peers_by_txrx(
         .collect::<Vec<_>>())
 }
 
-pub(crate) fn get_all_peers(if_name: &String) -> Result<Vec<Key>, std::io::Error> {
+pub(crate) fn get_all_peers(if_name: &str) -> Result<Vec<Key>, std::io::Error> {
     log::trace!("get_all_peers()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
