@@ -43,7 +43,14 @@ pub(crate) fn handle_inactive_peers(
 fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
     let new_port = utils::get_random_port();
     let new_listen_port = if traverse_nat {
-        let nat = nat::detect_kind(new_port).ok()?;
+        let nat = match nat::detect_kind(new_port) {
+            Ok(nat) => nat,
+            Err(e) => {
+                log::error!("NAT dection failed: {e}");
+                return None;
+            }
+        };
+
         log::debug!("NAT: {nat:?}");
         let observed_port = match nat {
             nat::NatKind::Easy => Some(new_port),
@@ -51,7 +58,8 @@ fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
                 Some(port_mapping_nat.obsereved_port)
             }
             nat::NatKind::Hard => {
-                log::warn!("can't do much about Hard NAT atm, will try again in a bit .. ");
+                log::trace!("Destination-Dependent NAT detected");
+                log::warn!("NAT traversal failed");
                 None
             }
         };
