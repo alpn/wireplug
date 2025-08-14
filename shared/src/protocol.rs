@@ -48,7 +48,7 @@ impl WireplugAnnounce {
     pub fn valid(&self) -> bool {
         self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
             && is_valid_wgkey(&self.initiator_pubkey)
-            && self.peer_pubkeys.iter().all(|p| is_valid_wgkey(p))
+            && self.peer_pubkeys.iter().all(is_valid_wgkey)
             && self.listen_port >= 1024
     }
 }
