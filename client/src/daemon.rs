@@ -100,7 +100,8 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         }
         if inactive_peers.len() > 0 {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
-            let port_to_announce = wg_interface::get_port(ifname).context("listen port is not set")?;
+            let port_to_announce =
+                wg_interface::get_port(ifname).context("listen port is not set")?;
             handle_inactive_peers(ifname, &mut inactive_peers, port_to_announce)?;
         } else {
             wg_interface::show_peers(ifname)?;

@@ -1,5 +1,5 @@
 use shared::{
-    self, BINCODE_CONFIG, WP_WIREPLUG_ORG,
+    self, BINCODE_CONFIG, WIREPLUG_ORG_WP,
     protocol::{self, WireplugResponse},
 };
 use std::{
@@ -40,7 +40,7 @@ fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
     let config = std::sync::Arc::new(config);
     Ok(rustls::ClientConnection::new(
         config,
-        shared::WIREPLUG_ORG_DOMAIN_TMP.try_into()?,
+        WIREPLUG_ORG_WP.try_into()?,
     )?)
 }
 
@@ -58,7 +58,7 @@ pub(crate) fn announce(
         )));
     };
 
-    let mut socket = TcpStream::connect(WP_WIREPLUG_ORG)?;
+    let mut socket = TcpStream::connect((WIREPLUG_ORG_WP, 443))?;
     let mut client_connection = get_tls_client_connection()
         .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);

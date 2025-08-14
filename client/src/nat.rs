@@ -1,5 +1,8 @@
 use shared::{BINCODE_CONFIG, protocol};
-use std::net::{SocketAddr, UdpSocket};
+use std::{
+    net::{SocketAddr, ToSocketAddrs, UdpSocket},
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub(crate) struct PortMappingNat {
@@ -32,6 +35,7 @@ fn send_stun_request(
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{local_port}"))?;
+    socket.set_read_timeout(Some(Duration::from_millis(500)))?;
     let _ = socket.send_to(&buf, dst)?;
 
     let mut res = [0u8; 1024];
@@ -44,14 +48,15 @@ fn send_stun_request(
 }
 
 pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
-    let stun1: SocketAddr = shared::WIREPLUG_ORG_STUN1
-        .parse()
-        .map_err(|e| std::io::Error::other(format!("{e}")))?;
-
-    let stun2: SocketAddr = shared::WIREPLUG_ORG_STUN2
-        .parse()
-        .map_err(|e| std::io::Error::other(format!("{e}")))?;
-
+    log::trace!("nat::detect_kind()");
+    let stun1 = (shared::WIREPLUG_ORG_STUN1, shared::WIREPLUG_STUN_PORT)
+        .to_socket_addrs()?
+        .next()
+        .expect("could not resolve STUN address");
+    let stun2 = (shared::WIREPLUG_ORG_STUN2, shared::WIREPLUG_STUN_PORT)
+        .to_socket_addrs()?
+        .next()
+        .expect("could not resolve STUN address");
     let nat = match (
         send_stun_request(stun1, local_port)?.result,
         send_stun_request(stun2, local_port)?.result,

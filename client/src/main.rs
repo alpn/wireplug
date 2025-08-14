@@ -30,7 +30,12 @@ struct Cli {
     log_level: Option<LogLevelPicker>,
 }
 
-fn start(ifname: &String, config_file: Option<String>, log_level: Level, traverse_nat: bool) -> anyhow::Result<()> {
+fn start(
+    ifname: &String,
+    config_file: Option<String>,
+    log_level: Level,
+    traverse_nat: bool,
+) -> anyhow::Result<()> {
     log::set_max_level(log_level.to_level_filter());
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");
@@ -59,7 +64,7 @@ fn main() {
             LogLevelPicker::High => Level::Trace,
         },
         None => Level::Info,
-     };
+    };
 
     if let Err(e) = start(ifname, cli.config, log_level, traverse_nat) {
         eprintln!("fatal: {e}");
