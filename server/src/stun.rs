@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use shared::{BINCODE_CONFIG, protocol};
-use tokio::{net::UdpSocket, sync::Mutex};
+use tokio::net::UdpSocket;
 
-pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
+pub async fn start_serving(bind_to: String) {
     let socket = match UdpSocket::bind(bind_to).await {
         Ok(s) => s,
         Err(e) => {
@@ -24,7 +24,6 @@ pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
         log::debug!("udp test from addr: {:?}", &addr);
         let observed_port = addr.port();
         let socket = Arc::clone(&socket);
-        let mtx = Arc::clone(&mtx);
         tokio::spawn(async move {
             let udp_test_request: protocol::WireplugStunRequest =
                 match bincode::decode_from_slice(&buf[..], BINCODE_CONFIG) {
@@ -35,7 +34,6 @@ pub async fn start_serving(bind_to: String, mtx: Arc<Mutex<()>>) {
                     }
                 };
 
-            let _guard = mtx.lock().await;
             log::debug!("stated port: {}", udp_test_request.port);
             log::debug!("observed port: {observed_port}");
             let udp_test_response = match observed_port == udp_test_request.port {

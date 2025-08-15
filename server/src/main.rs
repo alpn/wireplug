@@ -1,8 +1,8 @@
-use chrono::Utc;
 use clap::Parser;
 use shared::protocol::{WireplugEndpoint, WireplugResponse};
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use shared::{BINCODE_CONFIG, TmpLogger, protocol};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 use rustls::pki_types::pem::PemObject;
 use tokio_rustls::{TlsAcceptor, rustls};
@@ -21,6 +21,7 @@ use tokio_rustls::{TlsAcceptor, rustls};
 use openbsd::pledge;
 
 pub mod config;
+pub mod status;
 pub mod stun;
 
 #[derive(Parser)]
@@ -116,25 +117,12 @@ where
     Ok(())
 }
 
-async fn status(storage: &Storage) {
-    print!("\x1B[2J\x1B[1;1H");
-    println!("\n\nPeers:\n-----");
-    for p in storage.read().await.iter() {
-        let peer_a = &p.0.0;
-        let peer_b = &p.0.1;
-        let ip = p.1.wan_addr;
-        let timestamp = &p.1.timestamp;
-        let datetime: chrono::DateTime<Utc> = (*timestamp).into();
-        println!("\t{peer_a} @{ip} -> {peer_b} | {datetime}");
-    }
-}
-
 async fn start(cli: Cli) -> anyhow::Result<()> {
+    #[cfg(target_os = "openbsd")]
+    openbsd::pledge!("stdio inet rpath unix", "")?;
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting wireplug server");
-    #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet rpath", "")?;
     //XXX: unveil here
     let config = config::read_from_file(&cli.config)?;
     let cert_path = PathBuf::from_str(&config.cert_path)?;
@@ -142,23 +130,25 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     let cert = CertificateDer::pem_file_iter(&cert_path)?.collect::<Result<Vec<_>, _>>()?;
     let key = PrivateKeyDer::from_pem_file(&key_path)?;
-
     #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet", "")?;
+    openbsd::pledge!("stdio inet unix", "")?;
 
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
-    let arc_mutex = Arc::new(Mutex::new(()));
-
-    let s = Arc::clone(&storage);
-    let mtx = Arc::clone(&arc_mutex);
-
-    tokio::spawn(async move {
-        loop {
-            let _guard = mtx.lock().await;
-            status(&s).await;
-            tokio::time::sleep(Duration::from_secs(3)).await;
+    match UnixStream::connect("/var/run/wireplugd.sock") {
+        Ok(mut unix_stream) => {
+            let s = Arc::clone(&storage);
+            tokio::spawn(async move {
+                if let Err(e) = status::write_to_socket(s, &mut unix_stream).await {
+                    log::error!("{e}");
+                }
+            });
         }
-    });
+        Err(e) => {
+            log::warn!("{e}");
+        }
+    };
+    #[cfg(target_os = "openbsd")]
+    openbsd::pledge!("stdio inet", "")?;
 
     let s = Arc::clone(&storage);
     tokio::spawn(async move {
@@ -180,11 +170,10 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     });
 
     for stun_addr in config.stun_listen_on {
-        let mtx = Arc::clone(&arc_mutex);
         log::info!("spawning STUN service @{stun_addr:?}");
         tokio::spawn(async move {
             let bind_to = format!("{stun_addr}:{}", shared::WIREPLUG_STUN_PORT);
-            stun::start_serving(bind_to, mtx).await;
+            stun::start_serving(bind_to).await;
         });
     }
 
