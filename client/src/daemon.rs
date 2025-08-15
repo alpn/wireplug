@@ -40,14 +40,6 @@ pub(crate) fn handle_inactive_peers(
     Ok(())
 }
 
-fn get_new_listen_port(traverse_nat: bool) -> Option<u16> {
-    let new_port = utils::get_random_port();
-    match traverse_nat {
-        true => nat::get_observed_port(new_port),
-        false => Some(new_port),
-    }
-}
-
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new();
     let mut peers_activity = wg_interface::PeersActivity::new();
@@ -66,14 +58,19 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 continue;
             }
             netstat::NetStatus::ChangedToNew => {
-                let new_listen_port = match get_new_listen_port(traverse_nat) {
-                    Some(port) => port,
-                    None => continue,
+                let new_port = utils::get_random_port();
+                let observed_port = match traverse_nat {
+                    true => match nat::get_observed_port(new_port){
+                        Some(port) => port,
+                        None => continue,
+                    },
+                    false => new_port,
                 };
-                log::debug!("updating listen port to {new_listen_port} ..");
+
+                log::debug!("updating listen port to {observed_port} ..");
                 // wait before reusing the port
                 std::thread::sleep(Duration::from_secs(3));
-                wg_interface::update_port(ifname, new_listen_port)?;
+                wg_interface::update_port(ifname, observed_port)?;
 
                 inactive_peers = wg_interface::get_all_peers(ifname)?;
                 next_inactivity_check += peer_is_inactive_duration;
