@@ -14,14 +14,30 @@ fn send_announcement<S: Read + Write>(
     stream: &mut S,
     announcement: protocol::WireplugAnnounce,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
-    let buf = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
+    let encoded_message = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
-    stream.write_all(&buf)?;
-    let mut res = [0u8; 1024];
-    let _ = stream.read(&mut res)?;
+    let encoded_message_size: [u8; 4] = u32::try_from(encoded_message.len())
+        .expect("Message length exceeds u32::MAX")
+        .to_le_bytes();
+    stream.write_all(&encoded_message_size)?;
+    stream.write_all(&encoded_message)?;
+
+    let mut length_bytes = [0u8; 4];
+    stream.read_exact(&mut length_bytes)?;
+    let encoded_length = u32::from_le_bytes(length_bytes) as usize;
+    if encoded_length > shared::MAX_MESSAGE_SIZE {
+        return Err(std::io::Error::other(format!(
+            "Message size {} exceeds maximum allowed size of {}",
+            encoded_length,
+            shared::MAX_MESSAGE_SIZE
+        )));
+    }
+    let mut encoded_message = vec![0u8; encoded_length];
+    stream.read_exact(&mut encoded_message)?;
+
     let (response, _): (protocol::WireplugResponse, usize) =
-        bincode::decode_from_slice(&res[..], BINCODE_CONFIG)
+        bincode::decode_from_slice(&encoded_message[..], BINCODE_CONFIG)
             .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     Ok(response)
@@ -46,7 +62,7 @@ fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
 
 pub(crate) fn announce(
     if_name: &String,
-    peers: &Vec<Key>,
+    peers: &[Key],
     announcement_port: u16,
     lan_addrs: &Option<Vec<String>>,
 ) -> Result<WireplugResponse, std::io::Error> {

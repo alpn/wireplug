@@ -44,15 +44,23 @@ async fn handle_connection<S>(
     mut stream: S,
     peer_addr: SocketAddr,
     storage: Storage,
-) -> std::io::Result<()>
+) -> anyhow::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
-    let mut buffer = [0u8; 1024];
-    stream.read(&mut buffer).await?;
+    let encoded_length = usize::try_from(stream.read_u32_le().await?)?;
+    if encoded_length > shared::MAX_MESSAGE_SIZE {
+        return Err(anyhow::anyhow!(
+            "Message size {} exceeds maximum allowed size of {}",
+            encoded_length,
+            shared::MAX_MESSAGE_SIZE
+        ));
+    }
+
+    let mut buffer = [0u8; shared::MAX_MESSAGE_SIZE];
+    stream.read_exact(&mut buffer[0..encoded_length]).await?;
     let (announcement, _): (protocol::WireplugAnnounce, usize) =
-        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)
-            .map_err(|e| std::io::Error::other(format!("decoding error: {e}")))?;
+        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)?;
 
     let announcer_ip = peer_addr.ip();
     if !announcement.valid() {
@@ -97,9 +105,12 @@ where
         }
     }
     let response = WireplugResponse::from_peer_endpoints(res_peers);
-    let buffer = bincode::encode_to_vec(&response, BINCODE_CONFIG)
-        .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
-    stream.write_all(&buffer).await?;
+    let encoded_message = bincode::encode_to_vec(&response, BINCODE_CONFIG)?;
+    let encoded_size_bytes: [u8; 4] = u32::try_from(encoded_message.len())?.to_le_bytes();
+
+    stream.write_all(&encoded_size_bytes).await?;
+    stream.write_all(&encoded_message).await?;
+
     stream.shutdown().await?;
 
     Ok(())

@@ -9,13 +9,14 @@ pub const WIREPLUG_ORG_STUN1: &str = "stun1.wireplug.org";
 pub const WIREPLUG_ORG_STUN2: &str = "stun2.wireplug.org";
 pub const WIREPLUG_ORG_WP: &str = "a.wireplug.org";
 
+pub const MAX_MESSAGE_SIZE: usize = 4096;
 pub const BINCODE_CONFIG: Configuration<
     bincode::config::LittleEndian,
     bincode::config::Fixint,
-    bincode::config::Limit<4096>,
+    bincode::config::Limit<MAX_MESSAGE_SIZE>,
 > = bincode::config::standard()
     .with_fixed_int_encoding()
-    .with_limit::<4096>();
+    .with_limit::<MAX_MESSAGE_SIZE>();
 
 pub struct TmpLogger;
 
