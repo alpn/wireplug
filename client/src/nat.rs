@@ -6,14 +6,14 @@ use std::{
 
 #[derive(Debug)]
 pub(crate) struct PortMappingNat {
-    pub listen_port: u16,
+    pub _listen_port: u16,
     pub obsereved_port: u16,
 }
 
 impl PortMappingNat {
     fn new(listen_port: u16, observed_port: u16) -> Self {
         Self {
-            listen_port,
+            _listen_port: listen_port,
             obsereved_port: observed_port,
         }
     }
@@ -47,8 +47,7 @@ fn send_stun_request(
     Ok(response)
 }
 
-pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
-    log::trace!("nat::detect_kind()");
+fn detect_port_mapping(local_port: u16) -> Result<NatKind, std::io::Error> {
     let stun1 = (shared::WIREPLUG_ORG_STUN1, shared::WIREPLUG_STUN_PORT)
         .to_socket_addrs()?
         .next()
@@ -85,4 +84,26 @@ pub(crate) fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
         ) => todo!(),
     };
     Ok(nat)
+}
+
+pub fn get_observed_port(port: u16) -> Option<u16> {
+    log::trace!("get_observed_port({port})");
+    let nat = match detect_port_mapping(port) {
+        Ok(nat) => nat,
+        Err(e) => {
+            log::error!("NAT dection failed: {e}");
+            return None;
+        }
+    };
+
+    log::debug!("NAT: {nat:?}");
+    match nat {
+        NatKind::Easy => Some(port),
+        NatKind::FixedPortMapping(port_mapping_nat) => Some(port_mapping_nat.obsereved_port),
+        NatKind::Hard => {
+            log::trace!("Destination-Dependent NAT detected");
+            log::warn!("NAT traversal failed");
+            None
+        }
+    }
 }
