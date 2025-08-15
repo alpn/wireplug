@@ -9,7 +9,7 @@ pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
 pub const LAST_HANDSHAKE_MAX: u64 = 180;
 
-fn is_valid_wgkey(s: &String) -> bool {
+fn is_valid_wgkey(s: &str) -> bool {
     if s.len() != 44 {
         return false;
     }
@@ -48,7 +48,7 @@ impl WireplugAnnounce {
     pub fn valid(&self) -> bool {
         self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
             && is_valid_wgkey(&self.initiator_pubkey)
-            && self.peer_pubkeys.iter().all(is_valid_wgkey)
+            && self.peer_pubkeys.iter().all(|p| is_valid_wgkey(p))
             && self.listen_port >= 1024
     }
 }
