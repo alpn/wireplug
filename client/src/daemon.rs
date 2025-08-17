@@ -52,17 +52,20 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     let mut inactive_peers = vec![];
     loop {
         match netmon.status() {
-            netstat::NetStatus::NoChange | netstat::NetStatus::ChangedToPrev => (),
-            netstat::NetStatus::Offline => {
+            netstat::NetStatus::Online | netstat::NetStatus::ChangedToPrev => (),
+            netstat::NetStatus::Offline | netstat::NetStatus::HardNat => {
                 thread::sleep(Duration::from_secs(5));
                 continue;
             }
             netstat::NetStatus::ChangedToNew => {
                 let new_port = utils::get_random_port();
                 let observed_port = match traverse_nat {
-                    true => match nat::get_observed_port(new_port){
+                    true => match nat::get_observed_port(new_port) {
                         Some(port) => port,
-                        None => continue,
+                        None => {
+                            netmon.set_hard_nat(true);
+                            continue;
+                        }
                     },
                     false => new_port,
                 };
