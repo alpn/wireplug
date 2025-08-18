@@ -84,6 +84,7 @@ impl NetworkMonitor {
         }
         if self.last_online == new_info {
             log::trace!("Network: changed to previous");
+            self.current = new_info;
             return match self.hard_nat {
                 true => NetStatus::HardNat,
                 false => NetStatus::ChangedToPrev,
