@@ -248,9 +248,9 @@ dependencies = [
  "bincode",
  "clap",
  "getifaddrs",
+ "innernet-publicip",
  "ipnet",
  "log",
- "publicip",
  "rand",
  "rustls",
  "serde",
@@ -421,6 +421,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "innernet-publicip"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cc19af81e21aca8572fc2dcdec4f266a93f745595e543b454823b5cd0351238"
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -574,7 +580,8 @@ dependencies = [
 
 [[package]]
 name = "netlink-request"
-version = "1.6.1"
+version = "1.7.0"
+source = "git+https://github.com/alpn/innernet?branch=hash-key#6117c5600002326b2e1efbbc18e5764678ad0c94"
 dependencies = [
  "netlink-packet-core",
  "netlink-packet-generic",
@@ -716,10 +723,6 @@ checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
 ]
-
-[[package]]
-name = "publicip"
-version = "0.1.0"
 
 [[package]]
 name = "quote"
@@ -1386,7 +1389,8 @@ dependencies = [
 
 [[package]]
 name = "wireguard-control"
-version = "1.6.1"
+version = "1.7.0"
+source = "git+https://github.com/alpn/innernet?branch=hash-key#6117c5600002326b2e1efbbc18e5764678ad0c94"
 dependencies = [
  "base64",
  "hex",

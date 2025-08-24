@@ -19,14 +19,8 @@ impl NetInfo {
         }
     }
     fn detect() -> Self {
-        //let (wan_ip4, wan_ip6) = publicip::get_both();
-        //NetInfo { wan_ip4, wan_ip6 }
-
-        let wan_ip4 = publicip::get_v4_with_timout(1000);
-        NetInfo {
-            wan_ip4,
-            wan_ip6: None,
-        }
+        let (wan_ip4, wan_ip6) = innernet_publicip::get_both();
+        NetInfo { wan_ip4, wan_ip6 }
     }
     fn online(&self) -> bool {
         self.wan_ip4.is_some()

@@ -8,8 +8,7 @@ shared = { path = "../shared" }
 serde = { version = "1.0", features = ["derive"] }
 bincode = { version = "2.0", features = ["serde"] }
 
-wireguard-control = { path = "../../innernet/wireguard-control" }
-publicip = { path = "../../innernet/publicip" }
+wireguard-control = { git = "https://github.com/alpn/innernet", branch = "hash-key" }
 ipnet = "2.11.0"
 clap = { version = "4.5.40", features = ["derive"] }
 toml = "0.8.23"
@@ -19,3 +18,4 @@ webpki-roots = "1.0.1"
 rustls = { version = "0.23.29", default-features = false, features = ["std", "ring"] }
 anyhow = "1.0.98"
 log = "0.4.27"
+innernet-publicip = "1.7.0"
