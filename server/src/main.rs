@@ -186,7 +186,13 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let listener = TcpListener::bind(wp_listen_addr).await?;
 
     loop {
-        let (socket, peer_addr) = listener.accept().await?;
+        let (socket, peer_addr) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(e) => {
+                log::error!("{e}");
+                continue;
+            }
+        };
         let acceptor = acceptor.clone();
         let s = Arc::clone(&storage);
 
