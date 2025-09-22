@@ -156,6 +156,15 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
     }
 }
 
+fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()> {
+    let addr = IpNet::from_str(config.interface.address.as_str())
+        .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
+    set_addr(&ifname, addr)?;
+    #[cfg(target_os = "macos")]
+    add_route(&ifname, addr)?;
+    Ok(())
+}
+
 pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<()> {
     let ifname: InterfaceName = ifname.parse()?;
     let update = match config {
@@ -172,11 +181,7 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
                 peers.push(peer_config);
             }
 
-            let addr = IpNet::from_str(config.interface.address.as_str())
-                .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-            set_addr(&ifname, addr)?;
-            #[cfg(target_os = "macos")]
-            add_route(&ifname, addr)?;
+            configure_inet(&ifname, &config)?;
 
             DeviceUpdate::new()
                 .set_keypair(KeyPair::from_private(Key::from_base64(
