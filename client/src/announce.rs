@@ -8,11 +8,9 @@ use std::{
 };
 use wireguard_control::{Backend, Device, Key};
 
-const _RETRY_INTERVAL_SEC: u64 = 10;
-
 fn send_announcement<S: Read + Write>(
     stream: &mut S,
-    announcement: protocol::WireplugAnnounce,
+    announcement: protocol::WireplugAnnouncement,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
     let encoded_message = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
@@ -79,7 +77,7 @@ pub(crate) fn announce(
         .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
 
-    let announcement = protocol::WireplugAnnounce::new(
+    let announcement = protocol::WireplugAnnouncement::new(
         &initiator_pubkey.to_base64(),
         peers.iter().map(|p| p.to_base64()).collect(),
         announcement_port,

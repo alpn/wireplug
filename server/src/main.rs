@@ -60,7 +60,7 @@ where
 
     let mut buffer = [0u8; shared::MAX_MESSAGE_SIZE];
     stream.read_exact(&mut buffer[0..encoded_length]).await?;
-    let (announcement, _): (protocol::WireplugAnnounce, usize) =
+    let (announcement, _): (protocol::WireplugAnnouncement, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)?;
 
     let announcer_ip = peer_addr.ip();

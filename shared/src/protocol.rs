@@ -22,7 +22,7 @@ fn is_valid_wgkey(s: &str) -> bool {
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
-pub struct WireplugAnnounce {
+pub struct WireplugAnnouncement {
     proto: String,
     pub initiator_pubkey: String,
     pub peer_pubkeys: Vec<String>,
@@ -30,14 +30,14 @@ pub struct WireplugAnnounce {
     pub lan_addrs: Option<Vec<String>>,
 }
 
-impl WireplugAnnounce {
+impl WireplugAnnouncement {
     pub fn new(
         initiator_pubkey: &String,
         peer_pubkeys: Vec<String>,
         listen_port: u16,
         lan_addrs: Option<Vec<String>>,
     ) -> Self {
-        WireplugAnnounce {
+        WireplugAnnouncement {
             proto: String::from(WIREPLUG_PROTOCOL_VERSION),
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkeys,
