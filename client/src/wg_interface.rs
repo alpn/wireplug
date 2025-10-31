@@ -1,4 +1,3 @@
-#[cfg(any(target_os = "macos", target_os = "openbsd"))]
 use std::io;
 use std::{
     collections::HashMap,
@@ -14,6 +13,10 @@ use wireguard_control::{
 };
 
 use crate::config::Config;
+
+pub const COMMON_PKA: u16 = 25;
+// WireGuard's rekey interval, and some
+pub const LAST_HANDSHAKE_MAX: u64 = 180;
 
 pub struct PeersActivity {
     activity: HashMap<Key, u64>,
@@ -110,6 +113,8 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
         )))
     }
 }
+
+#[cfg(any(target_os = "macos", target_os = "openbsd"))]
 pub fn set_addr(
     interface: &InterfaceName,
     addr: IpNet,
@@ -176,7 +181,7 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
                     &Key::from_base64(&peer.public_key)
                         .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
                 )
-                .set_persistent_keepalive_interval(protocol::COMMON_PKA)
+                .set_persistent_keepalive_interval(COMMON_PKA)
                 .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32);
                 peers.push(peer_config);
             }
@@ -197,17 +202,14 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
                     .iter()
                     .map(|p| {
                         PeerConfigBuilder::new(&p.config.public_key)
-                            .set_persistent_keepalive_interval(protocol::COMMON_PKA)
+                            .set_persistent_keepalive_interval(COMMON_PKA)
                     })
                     .collect::<Vec<_>>(),
             )
         }
     };
 
-    log::debug!(
-        "{ifname}: setting wgpka={} on all peers",
-        protocol::COMMON_PKA
-    );
+    log::debug!("{ifname}: setting wgpka={} on all peers", COMMON_PKA);
     update.apply(&ifname, Backend::default())?;
 
     Ok(())
@@ -234,11 +236,11 @@ fn update_peer(
 
 pub(crate) fn update_peers(
     if_name: &str,
-    response: WireplugResponse,
+    peer_endpoints: HashMap<String, protocol::WireplugEndpoint>,
 ) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
     let mut peers_updated = vec![];
-    for (peer, peer_endpoint) in response.peer_endpoints {
+    for (peer, peer_endpoint) in peer_endpoints {
         let Ok(peer_pubkey) = Key::from_base64(&peer) else {
             log::error!("bad peer pubkey");
             continue;
@@ -306,7 +308,7 @@ pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &str) -> anyhow::Res
         .iter()
         .filter(|p| match p.stats.last_handshake_time {
             Some(last_handshake) => match now.duration_since(last_handshake) {
-                Ok(duration) => duration > Duration::from_secs(protocol::LAST_HANDSHAKE_MAX),
+                Ok(duration) => duration > Duration::from_secs(LAST_HANDSHAKE_MAX),
                 Err(e) => {
                     log::warn!("failed to get duration since last handshake ({e})");
                     true
@@ -318,7 +320,7 @@ pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &str) -> anyhow::Res
         .collect::<Vec<_>>())
 }
 
-pub(crate) fn get_inactive_peers_by_txrx(
+pub(crate) fn get_inactive_peers_by_rx(
     if_name: &str,
     peers_activity: &mut PeersActivity,
 ) -> Result<Vec<Key>, std::io::Error> {

@@ -77,11 +77,13 @@ fn detect_port_mapping(local_port: u16) -> Result<NatKind, std::io::Error> {
         (
             protocol::WireplugStunResult::SamePort,
             protocol::WireplugStunResult::DifferentPort(_),
-        ) => todo!(),
-        (
+        )
+        | (
             protocol::WireplugStunResult::DifferentPort(_),
             protocol::WireplugStunResult::SamePort,
-        ) => todo!(),
+        ) => {
+            return Err(std::io::Error::other("NAT inconsistent result"));
+        }
     };
     Ok(nat)
 }

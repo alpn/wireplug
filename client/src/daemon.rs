@@ -18,10 +18,11 @@ pub(crate) fn handle_inactive_peers(
     port_to_announce: u16,
 ) -> anyhow::Result<()> {
     let lan_addrs = utils::get_lan_addrs(ifname).ok();
-    for _ in 1..=3 {
+    const MAX_ANNOUNCE_RETRIES: usize = 3;
+    for _ in 1..=MAX_ANNOUNCE_RETRIES {
         match announce::announce(ifname, peers, port_to_announce, &lan_addrs) {
             Ok(response) => {
-                let peers_updated = wg_interface::update_peers(ifname, response)?;
+                let peers_updated = wg_interface::update_peers(ifname, response.peer_endpoints)?;
                 if !peers_updated.is_empty() {
                     log::info!(
                         "some endpoints were updated, waiting for peers to attempt handshakes.."
@@ -82,7 +83,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         if Instant::now() > next_inactivity_check {
             next_inactivity_check += peer_is_inactive_duration;
             inactive_peers.clear();
-            inactive_peers = wg_interface::get_inactive_peers_by_txrx(ifname, &mut peers_activity)?;
+            inactive_peers = wg_interface::get_inactive_peers_by_rx(ifname, &mut peers_activity)?;
         }
         if !inactive_peers.is_empty() {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());

@@ -18,6 +18,7 @@ enum LogLevelPicker {
     Medium,
     High,
 }
+
 #[derive(Parser)]
 #[command(version, name="Wireplug", about="", long_about = None)]
 struct Cli {
