@@ -63,7 +63,6 @@ where
     let (announcement, _): (protocol::WireplugAnnouncement, usize) =
         bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)?;
 
-    let announcer_ip = peer_addr.ip();
     if !announcement.valid() {
         stream.shutdown().await?;
         return Ok(());
@@ -83,25 +82,27 @@ where
             );
         }
     }
+
     let mut res_peers = HashMap::new();
     {
         let storage_reader = storage.read().await;
 
         for peer in announcement.peer_pubkeys {
-            let peer_endpoint;
-            match storage_reader.get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned())) {
+            let peer_endpoint = match storage_reader
+                .get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned()))
+            {
                 Some(record) => {
-                    if announcer_ip == record.wan_addr.ip() {
-                        peer_endpoint = WireplugEndpoint::LocalNetwork {
+                    if peer_addr.ip() == record.wan_addr.ip() {
+                        WireplugEndpoint::LocalNetwork {
                             lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
                             listen_port: record.wan_addr.port(),
-                        };
+                        }
                     } else {
-                        peer_endpoint = WireplugEndpoint::RemoteNetwork(record.wan_addr);
+                        WireplugEndpoint::RemoteNetwork(record.wan_addr)
                     }
                 }
-                None => peer_endpoint = WireplugEndpoint::Unknown,
-            }
+                None => WireplugEndpoint::Unknown,
+            };
             res_peers.insert(peer.to_owned(), peer_endpoint);
         }
     }
@@ -147,6 +148,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
             log::warn!("{e}");
         }
     };
+
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet", "")?;
 
@@ -156,10 +158,10 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
             async {
                 let now = SystemTime::now();
                 s.write().await.retain(|_, record| {
-                    if let Ok(record_duration) = now.duration_since(record.timestamp) {
-                        if record_duration < Duration::from_secs(RECORD_TIMEOUT_SEC) {
-                            return true;
-                        }
+                    if let Ok(record_duration) = now.duration_since(record.timestamp)
+                        && record_duration < Duration::from_secs(RECORD_TIMEOUT_SEC)
+                    {
+                        return true;
                     }
                     false
                 });

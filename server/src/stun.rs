@@ -34,8 +34,8 @@ pub async fn start_serving(bind_to: String) {
                     }
                 };
 
-            log::debug!("stated port: {}", udp_test_request.port);
-            log::debug!("observed port: {observed_port}");
+            log::trace!("stated port: {}", udp_test_request.port);
+            log::trace!("observed port: {observed_port}");
             let udp_test_response = match observed_port == udp_test_request.port {
                 true => protocol::WireplugStunResponse::new(None),
                 false => protocol::WireplugStunResponse::new(Some(observed_port)),
