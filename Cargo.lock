@@ -581,7 +581,6 @@ dependencies = [
 [[package]]
 name = "netlink-request"
 version = "1.7.0"
-source = "git+https://github.com/alpn/innernet?branch=hash-key#6117c5600002326b2e1efbbc18e5764678ad0c94"
 dependencies = [
  "netlink-packet-core",
  "netlink-packet-generic",
@@ -1390,7 +1389,6 @@ dependencies = [
 [[package]]
 name = "wireguard-control"
 version = "1.7.0"
-source = "git+https://github.com/alpn/innernet?branch=hash-key#6117c5600002326b2e1efbbc18e5764678ad0c94"
 dependencies = [
  "base64",
  "hex",
