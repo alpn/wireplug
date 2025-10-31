@@ -7,7 +7,7 @@ use std::{
 };
 
 use ipnet::IpNet;
-use shared::protocol::{self, WireplugResponse};
+use shared::protocol::{self};
 use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
@@ -164,9 +164,9 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
 fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()> {
     let addr = IpNet::from_str(config.interface.address.as_str())
         .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-    set_addr(&ifname, addr)?;
+    set_addr(ifname, addr)?;
     #[cfg(target_os = "macos")]
-    add_route(&ifname, addr)?;
+    add_route(ifname, addr)?;
     Ok(())
 }
 
