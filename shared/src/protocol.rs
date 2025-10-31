@@ -3,12 +3,6 @@ use std::{collections::HashMap, net::SocketAddr};
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
 
-pub const MONITORING_INTERVAL: u64 = 180;
-pub const POST_UPDATE_INTERVAL: u64 = 60;
-pub const COMMON_PKA: u16 = 25;
-// WireGuard's rekey interval, and some
-pub const LAST_HANDSHAKE_MAX: u64 = 180;
-
 fn is_valid_wgkey(s: &str) -> bool {
     if s.len() != 44 {
         return false;
@@ -83,7 +77,6 @@ impl WireplugResponse {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct WireplugStunRequest {
-    // Add ID to get stats about hard NATs
     proto: String,
     pub port: u16,
 }
@@ -117,26 +110,3 @@ impl WireplugStunResponse {
         WireplugStunResponse { result: res }
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let announce = WireplugAnnounce::new(
-            "alicealicealicealicealicealicealicealicealic",
-            "bobbobbobbobbobbobbobbobbobbobbobbobbobbobbo",
-        );
-        println!("{:?}", announce);
-        let config = bincode::config::standard();
-        let v = bincode::encode_to_vec(&announce, config).unwrap();
-        println!("{:?}", &v);
-        let (hello2, size): (WireplugAnnounce, usize) =
-            bincode::decode_from_slice(&v[..], config).unwrap();
-        println!("{:?}", hello2);
-        assert_eq!(announce, hello2);
-    }
-}
-*/
