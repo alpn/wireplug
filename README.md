@@ -5,7 +5,7 @@
 `wireplug` is a minimalist connectivity coordinator for roaming [WireGuard®](https://www.wireguard.com) peers.
 Unlike other alternatives in this space, `wireplug` is geared toward users who want to manage their keys and network topology manually while still enjoying automatic endpoint updating and NAT traversal without having to run their own server.
 
- <img src="/wp.gif"  >
+![](https://github.com/alpn/wireplug/raw/main/.media/demo.gif)
 
 ## Background
 In vanilla WireGuard settings, an interface must be configured (at minimum) with the following:
