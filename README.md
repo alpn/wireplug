@@ -2,6 +2,8 @@
 
 [![Active Development](https://img.shields.io/badge/Maintenance%20Level-Actively%20Developed-brightgreen.svg)](https://gist.github.com/cheerfulstoic/d107229326a01ff0f333a1d3476e068d)
 
+🔥 **Warning** - this is currently an early preview; the coordination server at wireplug.org may be unavailable at times
+
 `wireplug` is a minimalist connectivity coordinator for roaming [WireGuard®](https://www.wireguard.com) peers.
 Unlike other alternatives in this space, `wireplug` is geared toward users who want to manage their keys and network topology manually while still enjoying automatic endpoint updating and NAT traversal without having to run their own server.
 
@@ -57,4 +59,4 @@ If two peers are on the same local network, `wireplug` will attempt to connect t
 
 This project has not received an independent security audit, and should be considered experimental software at this early point in its lifetime.
 
-`wireplug` uses the [wireguard-control crate](https://github.com/tonarino/innernet/tree/main/wireguard-control) crate maintained by @tonarino
+`wireplug` uses the [wireguard-control](https://github.com/tonarino/innernet/tree/main/wireguard-control) crate maintained by @tonarino
