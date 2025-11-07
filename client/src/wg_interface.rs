@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "linux"))]
 use std::io;
 use std::{
     collections::HashMap,
@@ -114,6 +115,9 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
     }
 }
 
+#[cfg(target_os = "linux")]
+use crate::netlink::set_addr;
+
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
 pub fn set_addr(
     interface: &InterfaceName,
@@ -132,6 +136,9 @@ pub fn set_addr(
     )?;
     Ok(output)
 }
+
+#[cfg(target_os = "linux")]
+use crate::netlink::add_route;
 
 #[cfg(target_os = "macos")]
 pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Error> {
@@ -165,7 +172,9 @@ fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()>
     let addr = IpNet::from_str(config.interface.address.as_str())
         .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
     set_addr(ifname, addr)?;
-    #[cfg(target_os = "macos")]
+    #[cfg(target_os = "linux")]
+    crate::netlink::set_up(ifname, 1420)?;
+    #[cfg(not(target_os = "openbsd"))]
     add_route(ifname, addr)?;
     Ok(())
 }

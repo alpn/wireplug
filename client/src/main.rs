@@ -1,3 +1,4 @@
+
 use clap::{Parser, ValueEnum};
 use log::Level;
 use shared::TmpLogger;
@@ -9,6 +10,8 @@ mod nat;
 mod netstat;
 mod utils;
 mod wg_interface;
+#[cfg(target_os = "linux")]
+mod netlink;
 
 static LOGGER: TmpLogger = TmpLogger;
 
