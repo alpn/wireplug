@@ -241,26 +241,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 
 [[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "clap",
- "getifaddrs",
- "innernet-publicip",
- "ipnet",
- "log",
- "rand",
- "rustls",
- "serde",
- "shared",
- "toml 0.8.23",
- "webpki-roots",
- "wireguard-control",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -592,6 +572,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "netlink-request"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e70081e79444a116edcfe10bc2eb0e0bd23271815c2031927a89109591831da4"
+dependencies = [
+ "netlink-packet-core",
+ "netlink-packet-generic",
+ "netlink-packet-route",
+ "netlink-packet-utils",
+ "netlink-sys",
+ "nix 0.25.1",
+ "once_cell",
+]
+
+[[package]]
 name = "netlink-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -902,23 +897,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40734c41988f7306bb04f0ecf60ec0f3f1caa34290e4e8ea471dcd3346483b83"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "chrono",
- "clap",
- "log",
- "openbsd",
- "serde",
- "shared",
- "tokio",
- "tokio-rustls",
- "toml 0.9.5",
 ]
 
 [[package]]
@@ -1399,11 +1377,35 @@ dependencies = [
  "netlink-packet-route",
  "netlink-packet-utils",
  "netlink-packet-wireguard",
- "netlink-request",
+ "netlink-request 1.7.0",
  "netlink-sys",
  "nix 0.30.1",
  "rand_core 0.6.4",
  "x25519-dalek",
+]
+
+[[package]]
+name = "wireplugd"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "clap",
+ "getifaddrs",
+ "innernet-publicip",
+ "ipnet",
+ "libc",
+ "log",
+ "netlink-packet-core",
+ "netlink-packet-route",
+ "netlink-request 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand",
+ "rustls",
+ "serde",
+ "shared",
+ "toml 0.8.23",
+ "webpki-roots",
+ "wireguard-control",
 ]
 
 [[package]]
@@ -1413,6 +1415,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags 2.9.1",
+]
+
+[[package]]
+name = "wpcod"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "chrono",
+ "clap",
+ "log",
+ "openbsd",
+ "serde",
+ "shared",
+ "tokio",
+ "tokio-rustls",
+ "toml 0.9.5",
 ]
 
 [[package]]
