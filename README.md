@@ -25,7 +25,7 @@ Note that `PrivateKey`, `PublicKey`, and `AllowedIPs` are typically static: they
 
 The `Endpoint`, however, could potentially change multiple times per day as peers move between networks. `wireplugd` (`wireplug`'s client) is a simple lightweight local daemon that monitors your network status and updates WireGuard `Endpoint`s, when needed, in order to maintain uninterrupted connectivity.
 
-Coordination is handled by `wireplug-serverd`. By default, `wireplugd` connects to an instance run by the author at ***wireplug.org***.
+Coordination is handled by `wpcod`. By default, `wireplugd` connects to an instance run by the author at ***wireplug.org***.
 Users may run their own instances, but a special effort has been made so they never have to. The protocol is deliberately simple and was designed so that clients share only the absolutely necessary information with the coordination server.
 
 ## Installation
