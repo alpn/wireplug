@@ -20,7 +20,5 @@ target/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-to_blk.sh
-to_xblk.sh
-to_alp.sh
+to_*.sh
 wg0.conf
