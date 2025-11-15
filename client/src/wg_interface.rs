@@ -119,12 +119,13 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
 use crate::netlink::set_addr;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub fn set_addr(interface: &str, addr: IpNet) -> Result<std::process::Output, std::io::Error> {
+pub fn set_addr(ifname: &InterfaceName, addr: IpNet) -> Result<std::process::Output, std::io::Error> {
+    let real_interface = wireguard_control::backends::userspace::resolve_tun(ifname)?;
     log::trace!("set_addr: {addr:?}");
     let output = cmd(
         "ifconfig",
         &[
-            interface,
+            &real_interface,
             "inet",
             &addr.to_string(),
             &addr.addr().to_string(),
@@ -138,7 +139,8 @@ pub fn set_addr(interface: &str, addr: IpNet) -> Result<std::process::Output, st
 use crate::netlink::add_route;
 
 #[cfg(target_os = "macos")]
-pub fn add_route(interface: &str, cidr: IpNet) -> Result<bool, io::Error> {
+pub fn add_route(ifname: &InterfaceName, cidr: IpNet) -> Result<bool, io::Error> {
+    let real_interface = wireguard_control::backends::userspace::resolve_tun(ifname)?;
     let output = cmd(
         "route",
         &[
@@ -151,14 +153,14 @@ pub fn add_route(interface: &str, cidr: IpNet) -> Result<bool, io::Error> {
             },
             &cidr.to_string(),
             "-interface",
-            interface,
+            &real_interface,
         ],
     )?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
         Err(io::Error::other(format!(
             "failed to add route for device {}: {}",
-            interface, stderr
+            &real_interface, stderr
         )))
     } else {
         Ok(!stderr.contains("File exists"))
@@ -166,14 +168,16 @@ pub fn add_route(interface: &str, cidr: IpNet) -> Result<bool, io::Error> {
 }
 
 fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()> {
-    let real_interface = wireguard_control::backends::userspace::resolve_tun(ifname)?;
     let addr = IpNet::from_str(config.interface.address.as_str())
         .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-    set_addr(&real_interface, addr)?;
+    set_addr(&ifname, addr)?;
+
     #[cfg(target_os = "linux")]
     crate::netlink::set_up(ifname, 1420)?;
+
     #[cfg(not(target_os = "openbsd"))]
-    add_route(&real_interface, addr)?;
+    add_route(&ifname, addr)?;
+
     Ok(())
 }
 
