@@ -8,7 +8,6 @@ shared = { path = "../shared" }
 serde = { version = "1.0", features = ["derive"] }
 bincode = { version = "2.0", features = ["serde"] }
 
-wireguard-control = { path = "../../innernet/wireguard-control" }
 ipnet = "2.11.0"
 clap = { version = "4.5.40", features = ["derive"] }
 toml = "0.8.23"
@@ -19,6 +18,7 @@ rustls = { version = "0.23.29", default-features = false, features = ["std", "ri
 anyhow = "1.0.98"
 log = "0.4.27"
 innernet-publicip = "1.7.0"
+wireguard-control = "1.7.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 netlink-packet-core = "0.7"

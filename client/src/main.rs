@@ -1,4 +1,3 @@
-
 use clap::{Parser, ValueEnum};
 use log::Level;
 use shared::TmpLogger;
@@ -7,11 +6,11 @@ mod announce;
 mod config;
 mod daemon;
 mod nat;
+#[cfg(target_os = "linux")]
+mod netlink;
 mod netstat;
 mod utils;
 mod wg_interface;
-#[cfg(target_os = "linux")]
-mod netlink;
 
 static LOGGER: TmpLogger = TmpLogger;
 
@@ -43,6 +42,8 @@ fn start(
     log::set_max_level(log_level.to_level_filter());
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");
+
+    #[cfg(not(target_os = "macos"))]
     wg_interface::show_config(ifname)?;
 
     let config = match config_file {

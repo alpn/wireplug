@@ -119,15 +119,12 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
 use crate::netlink::set_addr;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub fn set_addr(
-    interface: &InterfaceName,
-    addr: IpNet,
-) -> Result<std::process::Output, std::io::Error> {
+pub fn set_addr(interface: &str, addr: IpNet) -> Result<std::process::Output, std::io::Error> {
     log::trace!("set_addr: {addr:?}");
     let output = cmd(
         "ifconfig",
         &[
-            &interface.to_string(),
+            interface,
             "inet",
             &addr.to_string(),
             &addr.addr().to_string(),
@@ -141,7 +138,7 @@ pub fn set_addr(
 use crate::netlink::add_route;
 
 #[cfg(target_os = "macos")]
-pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Error> {
+pub fn add_route(interface: &str, cidr: IpNet) -> Result<bool, io::Error> {
     let output = cmd(
         "route",
         &[
@@ -154,14 +151,14 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
             },
             &cidr.to_string(),
             "-interface",
-            &interface.to_string(),
+            interface,
         ],
     )?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !output.status.success() {
         Err(io::Error::other(format!(
-            "failed to add route for device {} ({}): {}",
-            &interface, interface, stderr
+            "failed to add route for device {}: {}",
+            interface, stderr
         )))
     } else {
         Ok(!stderr.contains("File exists"))
@@ -169,19 +166,20 @@ pub fn add_route(interface: &InterfaceName, cidr: IpNet) -> Result<bool, io::Err
 }
 
 fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()> {
+    let real_interface = wireguard_control::backends::userspace::resolve_tun(ifname)?;
     let addr = IpNet::from_str(config.interface.address.as_str())
         .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-    set_addr(ifname, addr)?;
+    set_addr(&real_interface, addr)?;
     #[cfg(target_os = "linux")]
     crate::netlink::set_up(ifname, 1420)?;
     #[cfg(not(target_os = "openbsd"))]
-    add_route(ifname, addr)?;
+    add_route(&real_interface, addr)?;
     Ok(())
 }
 
 pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<()> {
     let ifname: InterfaceName = ifname.parse()?;
-    let update = match config {
+    match config {
         Some(config) => {
             log::debug!("{ifname}: configuring using config file");
             let mut peers = vec![];
@@ -195,17 +193,20 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
                 peers.push(peer_config);
             }
 
-            configure_inet(&ifname, &config)?;
-
-            DeviceUpdate::new()
+            let update = DeviceUpdate::new()
                 .set_keypair(KeyPair::from_private(Key::from_base64(
                     &config.interface.private_key,
                 )?))
-                .add_peers(&peers)
+                .add_peers(&peers);
+
+            log::debug!("{ifname}: setting wgpka={} on all peers", COMMON_PKA);
+            update.apply(&ifname, Backend::default())?;
+
+            configure_inet(&ifname, &config)?;
         }
         None => {
             let device = Device::get(&ifname, Backend::default())?;
-            DeviceUpdate::new().add_peers(
+            let update = DeviceUpdate::new().add_peers(
                 &device
                     .peers
                     .iter()
@@ -214,12 +215,11 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
                             .set_persistent_keepalive_interval(COMMON_PKA)
                     })
                     .collect::<Vec<_>>(),
-            )
+            );
+            log::debug!("{ifname}: setting wgpka={} on all peers", COMMON_PKA);
+            update.apply(&ifname, Backend::default())?;
         }
     };
-
-    log::debug!("{ifname}: setting wgpka={} on all peers", COMMON_PKA);
-    update.apply(&ifname, Backend::default())?;
 
     Ok(())
 }
