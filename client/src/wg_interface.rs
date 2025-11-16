@@ -119,7 +119,10 @@ fn cmd(bin: &str, args: &[&str]) -> Result<std::process::Output, io::Error> {
 use crate::netlink::set_addr;
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
-pub fn set_addr(ifname: &InterfaceName, addr: IpNet) -> Result<std::process::Output, std::io::Error> {
+pub fn set_addr(
+    ifname: &InterfaceName,
+    addr: IpNet,
+) -> Result<std::process::Output, std::io::Error> {
     let real_interface = wireguard_control::backends::userspace::resolve_tun(ifname)?;
     log::trace!("set_addr: {addr:?}");
     let output = cmd(
@@ -170,13 +173,13 @@ pub fn add_route(ifname: &InterfaceName, cidr: IpNet) -> Result<bool, io::Error>
 fn configure_inet(ifname: &InterfaceName, config: &Config) -> anyhow::Result<()> {
     let addr = IpNet::from_str(config.interface.address.as_str())
         .map_err(|e| std::io::Error::other(format!("Parsing Error: {e}")))?;
-    set_addr(&ifname, addr)?;
+    set_addr(ifname, addr)?;
 
     #[cfg(target_os = "linux")]
     crate::netlink::set_up(ifname, 1420)?;
 
     #[cfg(not(target_os = "openbsd"))]
-    add_route(&ifname, addr)?;
+    add_route(ifname, addr)?;
 
     Ok(())
 }
