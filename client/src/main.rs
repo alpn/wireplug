@@ -22,8 +22,10 @@ enum LogLevelPicker {
 }
 
 #[derive(Parser)]
-#[command(version, name="wireplug", about="", long_about = None)]
+#[command(version, name="wireplugd", about="", long_about = None)]
 struct Cli {
+    #[arg(long)]
+    generate_config: bool,
     interface_name: String,
     #[arg(short, long)]
     config: Option<String>,
@@ -61,6 +63,15 @@ fn start(
 fn main() {
     let cli = Cli::parse();
     let ifname = &cli.interface_name;
+
+    if cli.generate_config {
+        match config::generate_example_to_file(ifname) {
+            Ok(_) => println!("new config created!"),
+            Err(e) => eprintln!("failed to create config file: {e}"),
+        }
+        return;
+    }
+
     let traverse_nat = !cli.no_nat;
     let log_level = match cli.log_level {
         Some(level) => match level {
