@@ -90,7 +90,7 @@ sudo wireplugd wg0
 2. Run `wireplugd`:
 
 ```sh
-sudo wireplugd wg0
+doas wireplugd wg0
 ```
 
 ## Features
