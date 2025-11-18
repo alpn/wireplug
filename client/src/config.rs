@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::io::{self, Error};
+use std::io::Error;
 use wireguard_control::Key;
+
+static CONFIG_PATH: &str = "/etc/wireplugd";
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
@@ -54,18 +56,20 @@ impl Peer {
     }
 }
 
-pub(crate) fn read_from_file(path: &String) -> io::Result<Config> {
+#[cfg(not(target_os = "openbsd"))]
+pub(crate) fn read_from_file(ifname: &String) -> std::io::Result<Config> {
+    let path = format!("{CONFIG_PATH}.{ifname}");
     let config = std::fs::read_to_string(path)?;
     toml::from_str(&config).map_err(|e| Error::other(format!("Config file parsing error: {e}")))
 }
 
 pub(crate) fn generate_example_to_file(ifname: &str) -> std::io::Result<()> {
-    let config_file_name = format!("{ifname}.conf");
-    if std::fs::exists(&config_file_name)? {
-        return Err(Error::other(format!("{config_file_name} already exists")));
+    let path = format!("{CONFIG_PATH}.{ifname}");
+    if std::fs::exists(&path)? {
+        return Err(Error::other(format!("{path} already exists")));
     }
     let config = Config::new_example_with_random_key();
     let config = toml::to_string(&config)
         .map_err(|e| std::io::Error::other(format!("serialization error: {e}")))?;
-    std::fs::write(&config_file_name, &config)
+    std::fs::write(&path, &config)
 }

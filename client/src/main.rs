@@ -27,9 +27,9 @@ struct Cli {
     #[arg(long)]
     generate_config: bool,
     interface_name: String,
-    #[arg(short, long)]
-    config: Option<String>,
     #[arg(long)]
+    no_config: bool,
+    #[arg(long, help = "Do not perform NAT traversal")]
     no_nat: bool,
     #[arg(short, long)]
     log_level: Option<LogLevelPicker>,
@@ -37,7 +37,7 @@ struct Cli {
 
 fn start(
     ifname: &String,
-    config_file: Option<String>,
+    no_config: bool,
     log_level: Level,
     traverse_nat: bool,
 ) -> anyhow::Result<()> {
@@ -48,9 +48,10 @@ fn start(
     #[cfg(not(target_os = "macos"))]
     wg_interface::show_config(ifname)?;
 
-    let config = match config_file {
-        Some(path) => Some(config::read_from_file(&path)?),
-        None => None,
+    let config = match no_config {
+        #[cfg(not(target_os = "openbsd"))]
+        false => Some(config::read_from_file(&ifname)?),
+        _ => None,
     };
 
     wg_interface::configure(ifname, config)?;
@@ -82,7 +83,7 @@ fn main() {
         None => Level::Info,
     };
 
-    if let Err(e) = start(ifname, cli.config, log_level, traverse_nat) {
+    if let Err(e) = start(ifname, cli.no_config, log_level, traverse_nat) {
         eprintln!("fatal: {e}");
         std::process::exit(1);
     }
