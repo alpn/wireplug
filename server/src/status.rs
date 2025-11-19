@@ -22,7 +22,7 @@ pub(crate) async fn write_to_socket(
                 let peer_b = &p.0.1;
                 let ip = p.1.wan_addr;
                 let timestamp = &p.1.timestamp;
-                let sec = now.duration_since(*timestamp).unwrap().as_secs();
+                let sec = now.duration_since(*timestamp)?.as_secs();
                 writeln!(writer, "\t{peer_a} @{ip} -> {peer_b} | {sec} sec ago")?;
             }
         }
