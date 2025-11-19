@@ -28,6 +28,8 @@ pub mod stun;
 #[command(version, name="wireplugd", about="", long_about = None)]
 struct Cli {
     config: String,
+    #[arg(short, long)]
+    debug: bool,
 }
 
 #[derive(Clone)]
@@ -135,19 +137,22 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     openbsd::pledge!("stdio inet unix", "")?;
 
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
-    match UnixStream::connect("/var/run/wireplugd.sock") {
-        Ok(mut unix_stream) => {
-            let s = Arc::clone(&storage);
-            tokio::spawn(async move {
-                if let Err(e) = status::write_to_socket(s, &mut unix_stream).await {
-                    log::error!("{e}");
-                }
-            });
-        }
-        Err(e) => {
-            log::warn!("{e}");
-        }
-    };
+
+    if cli.debug {
+        match UnixStream::connect("/var/run/wireplugd.sock") {
+            Ok(mut unix_stream) => {
+                let s = Arc::clone(&storage);
+                tokio::spawn(async move {
+                    if let Err(e) = status::write_to_socket(s, &mut unix_stream).await {
+                        log::error!("{e}");
+                    }
+                });
+            }
+            Err(e) => {
+                log::warn!("{e}");
+            }
+        };
+    }
 
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet", "")?;
