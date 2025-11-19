@@ -8,6 +8,8 @@ use std::{
 };
 use wireguard_control::{Backend, Device, Key};
 
+use crate::utils;
+
 fn send_announcement<S: Read + Write>(
     stream: &mut S,
     announcement: protocol::WireplugAnnouncement,
@@ -41,23 +43,6 @@ fn send_announcement<S: Read + Write>(
     Ok(response)
 }
 
-fn get_tls_client_connection() -> anyhow::Result<rustls::ClientConnection> {
-    let root_store = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-    };
-    let config = rustls::ClientConfig::builder_with_provider(
-        rustls::crypto::ring::default_provider().into(),
-    )
-    .with_safe_default_protocol_versions()?
-    .with_root_certificates(root_store)
-    .with_no_client_auth();
-    let config = std::sync::Arc::new(config);
-    Ok(rustls::ClientConnection::new(
-        config,
-        WIREPLUG_ORG_WP.try_into()?,
-    )?)
-}
-
 pub(crate) fn announce(
     if_name: &String,
     peers: &[Key],
@@ -73,7 +58,7 @@ pub(crate) fn announce(
     };
 
     let mut socket = TcpStream::connect((WIREPLUG_ORG_WP, 443))?;
-    let mut client_connection = get_tls_client_connection()
+    let mut client_connection = utils::get_tls_client_connection(WIREPLUG_ORG_WP)
         .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
 

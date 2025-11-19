@@ -1,5 +1,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use crate::utils;
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct NetInfo {
     wan_ip4: Option<Ipv4Addr>,
@@ -19,7 +21,16 @@ impl NetInfo {
         }
     }
     fn detect() -> Self {
-        let (wan_ip4, wan_ip6) = innernet_publicip::get_both();
+        let (mut wan_ip4, wan_ip6) = innernet_publicip::get_both();
+        if wan_ip4.is_none() {
+            wan_ip4 = utils::get_ip_over_https();
+            if wan_ip4.is_some() {
+                log::warn!(
+                    "Network: quad9 is blocked, ip found via HTTPS {:?}",
+                    wan_ip4
+                );
+            }
+        }
         NetInfo { wan_ip4, wan_ip6 }
     }
     fn online(&self) -> bool {

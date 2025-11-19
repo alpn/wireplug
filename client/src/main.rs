@@ -50,7 +50,7 @@ fn start(
 
     let config = match no_config {
         #[cfg(not(target_os = "openbsd"))]
-        false => Some(config::read_from_file(&ifname)?),
+        false => Some(config::read_from_file(ifname)?),
         _ => None,
     };
 
