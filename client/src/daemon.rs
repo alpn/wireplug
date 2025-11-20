@@ -82,6 +82,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 next_inactivity_check += peer_is_inactive_duration;
             }
         }
+
         if Instant::now() > next_inactivity_check {
             next_inactivity_check += peer_is_inactive_duration;
             inactive_peers.clear();

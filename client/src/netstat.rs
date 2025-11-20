@@ -13,6 +13,12 @@ struct NetInfo {
      */
 }
 
+impl PartialEq for NetInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.wan_ip4 == other.wan_ip4
+    }
+}
+
 impl NetInfo {
     fn new() -> Self {
         Self {
