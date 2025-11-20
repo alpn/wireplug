@@ -14,6 +14,7 @@ use crate::{
 
 pub(crate) fn handle_inactive_peers(
     ifname: &String,
+    peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
     port_to_announce: u16,
 ) -> anyhow::Result<()> {
@@ -22,7 +23,8 @@ pub(crate) fn handle_inactive_peers(
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
         match announce::announce(ifname, peers, port_to_announce, &lan_addrs) {
             Ok(response) => {
-                let peers_updated = wg_interface::update_peers(ifname, response.peer_endpoints)?;
+                let peers_updated =
+                    wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;
                 if !peers_updated.is_empty() {
                     log::info!(
                         "some endpoints were updated, waiting for peers to attempt handshakes.."
@@ -43,8 +45,8 @@ pub(crate) fn handle_inactive_peers(
 
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new();
-    let mut peers_activity = wg_interface::PeersActivity::new();
-    wg_interface::init_peers_activity(ifname, &mut peers_activity)?;
+    let mut peers_manager = wg_interface::PeerTracker::new();
+    wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 
     log::info!("monitoring interface: {ifname} with NAT travesal={traverse_nat}");
 
@@ -83,13 +85,18 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         if Instant::now() > next_inactivity_check {
             next_inactivity_check += peer_is_inactive_duration;
             inactive_peers.clear();
-            inactive_peers = wg_interface::get_inactive_peers_by_rx(ifname, &mut peers_activity)?;
+            inactive_peers = wg_interface::get_inactive_peers_by_rx(ifname, &mut peers_manager)?;
         }
         if !inactive_peers.is_empty() {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
             let port_to_announce =
                 wg_interface::get_port(ifname).context("listen port is not set")?;
-            handle_inactive_peers(ifname, &mut inactive_peers, port_to_announce)?;
+            handle_inactive_peers(
+                ifname,
+                &mut peers_manager,
+                &mut inactive_peers,
+                port_to_announce,
+            )?;
         } else {
             wg_interface::show_peers(ifname)?;
         }

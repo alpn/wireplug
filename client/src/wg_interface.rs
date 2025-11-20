@@ -19,31 +19,44 @@ pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
 pub const LAST_HANDSHAKE_MAX: u64 = 180;
 
-pub struct PeersActivity {
-    activity: HashMap<Key, u64>,
+struct WireplugPeerInfo {
+    pub current_endpoint: Option<SocketAddr>,
+    pub rx: u64,
 }
 
-impl PeersActivity {
+impl WireplugPeerInfo {
+    fn new(current_endpoint: Option<SocketAddr>, rx: u64) -> Self {
+        Self {
+            current_endpoint,
+            rx,
+        }
+    }
+}
+pub struct PeerTracker {
+    peers: HashMap<Key, WireplugPeerInfo>,
+}
+
+impl PeerTracker {
     pub fn new() -> Self {
         Self {
-            activity: HashMap::new(),
+            peers: HashMap::new(),
         }
     }
 
     fn update(&mut self, peer: &PeerInfo) -> bool {
         let new_rx = peer.stats.rx_bytes;
         let msg = format!("\tpeer: {} .. ", &peer.config.public_key.to_base64());
-        match self.activity.get_mut(&peer.config.public_key) {
-            Some(prev_rx) => {
-                if new_rx > *prev_rx {
-                    *prev_rx = new_rx;
+        match self.peers.get_mut(&peer.config.public_key) {
+            Some(info) => {
+                if new_rx > info.rx {
+                    info.rx = new_rx;
                     log::trace!("{msg} OK");
                     return true;
                 }
             }
             None => {
-                self.activity
-                    .insert(peer.config.public_key.to_owned(), new_rx);
+                let info = WireplugPeerInfo::new(peer.config.endpoint, new_rx);
+                self.peers.insert(peer.config.public_key.to_owned(), info);
                 log::trace!("{msg} NEW");
                 return true;
             }
@@ -233,9 +246,26 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
 
 fn update_peer(
     iface: &InterfaceName,
+    peer_tracker: &mut PeerTracker,
     peer: &Key,
     new_endpoint: SocketAddr,
-) -> Result<(), std::io::Error> {
+) -> Result<bool, std::io::Error> {
+    let current_endpoint = peer_tracker
+        .peers
+        .get(peer)
+        .ok_or(std::io::Error::other(format!(
+            "PeerTracker has no entity for {}",
+            peer.to_base64()
+        )))?
+        .current_endpoint;
+
+    if let Some(endpoint) = current_endpoint
+        && endpoint == new_endpoint
+    {
+        log::trace!("update_peer(): same endpoint {:?}", endpoint);
+        return Ok(false);
+    }
+
     log::trace!(
         "updating if:{} peer {} @ {}",
         iface.as_str_lossy(),
@@ -246,17 +276,22 @@ fn update_peer(
     let peer_config = PeerConfigBuilder::new(peer).set_endpoint(new_endpoint);
     let update = DeviceUpdate::new().add_peers(&[peer_config]);
     update.apply(iface, Backend::default())?;
+    peer_tracker
+        .peers
+        .entry(peer.to_owned())
+        .and_modify(|p| p.current_endpoint = Some(new_endpoint));
 
-    Ok(())
+    Ok(true)
 }
 
 pub(crate) fn update_peers(
     if_name: &str,
-    peer_endpoints: HashMap<String, protocol::WireplugEndpoint>,
+    peer_tracker: &mut PeerTracker,
+    new_endpoints: HashMap<String, protocol::WireplugEndpoint>,
 ) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
     let mut peers_updated = vec![];
-    for (peer, peer_endpoint) in peer_endpoints {
+    for (peer, peer_endpoint) in new_endpoints {
         let Ok(peer_pubkey) = Key::from_base64(&peer) else {
             log::error!("bad peer pubkey");
             continue;
@@ -272,14 +307,16 @@ pub(crate) fn update_peers(
                     let ipnet = IpNet::from_str(addr.as_str())
                         .map_err(|e| std::io::Error::other(format!("{e}")))?;
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
-                    update_peer(&iface, &peer_pubkey, addr)?;
-                    peers_updated.push(peer_pubkey);
+                    if update_peer(&iface, peer_tracker, &peer_pubkey, addr)? {
+                        peers_updated.push(peer_pubkey);
+                    }
                 }
             }
             protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 log::debug!("wireplug.org: {peer} is @{wan_addr}");
-                update_peer(&iface, &peer_pubkey, wan_addr)?;
-                peers_updated.push(peer_pubkey);
+                if update_peer(&iface, peer_tracker, &peer_pubkey, wan_addr)? {
+                    peers_updated.push(peer_pubkey);
+                }
             }
         }
     }
@@ -301,13 +338,13 @@ pub(crate) fn get_port(ifname: &str) -> Option<u16> {
 
 pub(crate) fn init_peers_activity(
     if_name: &str,
-    peers_activity: &mut PeersActivity,
+    peer_tracker: &mut PeerTracker,
 ) -> Result<(), std::io::Error> {
     log::trace!("init_peers_activity()");
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
     device.peers.iter().for_each(|p| {
-        let _ = peers_activity.update(p);
+        let _ = peer_tracker.update(p);
     });
     Ok(())
 }
@@ -338,7 +375,7 @@ pub(crate) fn get_inactive_peers_by_last_handshake(if_name: &str) -> anyhow::Res
 
 pub(crate) fn get_inactive_peers_by_rx(
     if_name: &str,
-    peers_activity: &mut PeersActivity,
+    peer_tracker: &mut PeerTracker,
 ) -> Result<Vec<Key>, std::io::Error> {
     log::trace!("get_inactive_peers_by_txrx()");
     let iface = if_name.parse()?;
@@ -347,7 +384,7 @@ pub(crate) fn get_inactive_peers_by_rx(
     Ok(device
         .peers
         .iter()
-        .filter(|p| p.stats.last_handshake_time.is_none() || !peers_activity.update(p))
+        .filter(|p| p.stats.last_handshake_time.is_none() || !peer_tracker.update(p))
         .map(|p| p.config.public_key.to_owned())
         .collect::<Vec<_>>())
 }

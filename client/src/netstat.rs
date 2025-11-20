@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use crate::utils;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct NetInfo {
     wan_ip4: Option<Ipv4Addr>,
     wan_ip6: Option<Ipv6Addr>,
