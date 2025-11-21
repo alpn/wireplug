@@ -1,4 +1,5 @@
 use bincode::config::Configuration;
+use chrono::Local;
 use colored::Colorize;
 use log::{Level, Log, Metadata, Record};
 
@@ -34,7 +35,9 @@ impl Log for TmpLogger {
                 Level::Debug => "[D]".blue(),
                 Level::Trace => "[T]".purple(),
             };
-            println!("{level_str} {}", record.args());
+            //let now = Local::now().format("%Y-%m-%dT%H:%M:%S%.3f");
+            let now = Local::now().to_rfc2822();
+            println!("{now} {level_str} {}", record.args());
             /*
             if let Some(p) = record.module_path() && log::max_level() ==  Level::Trace {
                 println!("{level_str} {} {}", p.dimmed(), record.args());
