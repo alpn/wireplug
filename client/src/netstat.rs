@@ -32,7 +32,7 @@ impl NetInfo {
             wan_ip4 = utils::get_ip_over_https();
             if wan_ip4.is_some() {
                 log::warn!(
-                    "Network: quad9 is blocked, ip found via HTTPS {:?}",
+                    "Network: quad9 is unreachable, ip found via HTTPS {:?}",
                     wan_ip4
                 );
             }
