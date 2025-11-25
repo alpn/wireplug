@@ -4,7 +4,7 @@ use shared::{
 };
 use std::{
     io::{Read, Write},
-    net::TcpStream,
+    net::TcpStream, time::Duration,
 };
 use wireguard_control::{Backend, Device, Key};
 
@@ -58,6 +58,8 @@ pub(crate) fn announce(
     };
 
     let mut socket = TcpStream::connect((WIREPLUG_ORG_WP, 443))?;
+    socket.set_write_timeout(Some(Duration::from_secs(1)))?;
+    socket.set_read_timeout(Some(Duration::from_secs(1)))?;
     let mut client_connection = utils::get_tls_client_connection(WIREPLUG_ORG_WP)
         .map_err(|e| std::io::Error::other(format!("failed to create TLS client: {e}")))?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
