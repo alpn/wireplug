@@ -27,7 +27,6 @@ pub mod stun;
 #[derive(Parser)]
 #[command(version, name="wireplugd", about="", long_about = None)]
 struct Cli {
-    config: String,
     #[arg(short, long)]
     debug: bool,
 }
@@ -127,7 +126,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting wireplug server");
     //XXX: unveil here
-    let config = config::read_from_file(&cli.config)?;
+    let config = config::read_from_file()?;
     let cert_path = PathBuf::from_str(&config.cert_path)?;
     let key_path = PathBuf::from_str(&config.key_path)?;
 
