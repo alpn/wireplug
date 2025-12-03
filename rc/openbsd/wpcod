@@ -1,0 +1,11 @@
+#!/bin/ksh
+
+daemon="/usr/local/bin/wpcod"
+# daemon_flags="-f /etc/wpcod.conf"
+daemon_user="_wpcod"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_cmd $1

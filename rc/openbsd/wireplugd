@@ -1,0 +1,10 @@
+#!/bin/ksh
+
+daemon="/usr/local/bin/wireplugd"
+daemon_user="_wireplugd"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_cmd $1
