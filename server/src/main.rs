@@ -27,8 +27,10 @@ pub mod stun;
 #[derive(Parser)]
 #[command(version, name="wireplugd", about="", long_about = None)]
 struct Cli {
-    #[arg(short, long)]
+    #[arg(short, long, help = "do not daemonize")]
     debug: bool,
+    #[arg(short, long)]
+    monitor: bool,
 }
 
 #[derive(Clone)]
@@ -137,7 +139,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
 
-    if cli.debug {
+    if cli.monitor {
         match UnixStream::connect("/var/run/wireplugd.sock") {
             Ok(mut unix_stream) => {
                 let s = Arc::clone(&storage);
@@ -148,7 +150,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
                 });
             }
             Err(e) => {
-                log::warn!("{e}");
+                log::warn!("failed to open monitoring socket: {e}");
             }
         };
     }
@@ -219,12 +221,27 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     }
 }
 
+#[cfg(target_os = "openbsd")]
+unsafe extern "C" {
+    fn daemon(nochdir: i32, noclose: i32) -> i32;
+}
+
 fn main() {
     let cli = Cli::parse();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("could not build tokio runtime");
+
+    #[cfg(target_os = "openbsd")]
+    if !cli.debug {
+        unsafe {
+            if daemon(0, 0) == -1 {
+                eprintln!("daemon(3) failed");
+                std::process::exit(1);
+            }
+        }
+    }
 
     if let Err(e) = rt.block_on(start(cli)) {
         eprintln!("fatal: {e}");
