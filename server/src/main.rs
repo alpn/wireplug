@@ -2,7 +2,6 @@ use clap::Parser;
 use shared::protocol::{WireplugEndpoint, WireplugResponse};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -134,29 +133,23 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     let cert = CertificateDer::pem_file_iter(&cert_path)?.collect::<Result<Vec<_>, _>>()?;
     let key = PrivateKeyDer::from_pem_file(&key_path)?;
+
     #[cfg(target_os = "openbsd")]
     openbsd::pledge!("stdio inet unix", "")?;
 
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
 
     if cli.monitor {
-        match UnixStream::connect("/var/run/wireplugd.sock") {
-            Ok(mut unix_stream) => {
-                let s = Arc::clone(&storage);
-                tokio::spawn(async move {
-                    if let Err(e) = status::write_to_socket(s, &mut unix_stream).await {
-                        log::error!("{e}");
-                    }
-                });
+        let s = Arc::clone(&storage);
+        tokio::spawn(async move {
+            if let Err(e) = status::start_writer(s).await {
+                log::error!("{e}");
             }
-            Err(e) => {
-                log::warn!("failed to open monitoring socket: {e}");
-            }
-        };
-    }
-
-    #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet", "")?;
+        });
+    } else {
+        #[cfg(target_os = "openbsd")]
+        openbsd::pledge!("stdio inet", "")?;
+    };
 
     let s = Arc::clone(&storage);
     tokio::spawn(async move {
