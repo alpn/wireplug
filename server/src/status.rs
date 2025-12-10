@@ -5,6 +5,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+pub static MON_SOCK: &str = "/var/run/wireplugd.sock";
 use crate::Storage;
 
 pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
@@ -24,7 +25,7 @@ pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
                 writeln!(writer, "\t{peer_a} @{ip} -> {peer_b} | {sec} sec ago")?;
             }
         }
-        match UnixStream::connect("/var/run/wireplugd.sock") {
+        match UnixStream::connect(MON_SOCK) {
             Ok(mut unix_stream) => {
                 if let Err(e) = unix_stream.write_all(writer.as_bytes()) {
                     log::warn!("monitoring socket: {e}");

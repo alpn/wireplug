@@ -17,7 +17,7 @@ use rustls::pki_types::pem::PemObject;
 use tokio_rustls::{TlsAcceptor, rustls};
 
 #[cfg(target_os = "openbsd")]
-use openbsd::pledge;
+use openbsd::{pledge, unveil};
 
 pub mod config;
 pub mod status;
@@ -120,13 +120,22 @@ where
     Ok(())
 }
 
+#[cfg(target_os = "openbsd")]
+fn lockdown() -> anyhow::Result<()>{
+    openbsd::pledge!("stdio inet rpath unix unveil", "")?;
+    openbsd::unveil!("/etc", "r")?;
+    openbsd::unveil!(status::MON_SOCK, "rw")?;
+    openbsd::unveil::disable();
+    Ok(())
+}
+
 async fn start(cli: Cli) -> anyhow::Result<()> {
     #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet rpath unix", "")?;
+    lockdown()?;
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting wireplug server");
-    //XXX: unveil here
+
     let config = config::read_from_file()?;
     let cert_path = PathBuf::from_str(&config.cert_path)?;
     let key_path = PathBuf::from_str(&config.key_path)?;
