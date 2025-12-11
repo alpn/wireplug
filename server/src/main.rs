@@ -20,6 +20,8 @@ use tokio_rustls::{TlsAcceptor, rustls};
 use openbsd::{pledge, unveil};
 
 pub mod config;
+#[cfg(target_os = "openbsd")]
+pub mod lockdown;
 pub mod status;
 pub mod stun;
 
@@ -120,18 +122,9 @@ where
     Ok(())
 }
 
-#[cfg(target_os = "openbsd")]
-fn lockdown() -> anyhow::Result<()>{
-    openbsd::pledge!("stdio inet rpath unix unveil", "")?;
-    openbsd::unveil!("/etc", "r")?;
-    openbsd::unveil!(status::MON_SOCK, "rw")?;
-    openbsd::unveil::disable();
-    Ok(())
-}
-
 async fn start(cli: Cli) -> anyhow::Result<()> {
     #[cfg(target_os = "openbsd")]
-    lockdown()?;
+    lockdown::step1()?;
     log::set_max_level(log::LevelFilter::Trace);
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting wireplug server");
@@ -143,9 +136,6 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let cert = CertificateDer::pem_file_iter(&cert_path)?.collect::<Result<Vec<_>, _>>()?;
     let key = PrivateKeyDer::from_pem_file(&key_path)?;
 
-    #[cfg(target_os = "openbsd")]
-    openbsd::pledge!("stdio inet unix", "")?;
-
     let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
 
     if cli.monitor {
@@ -155,10 +145,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
                 log::error!("{e}");
             }
         });
-    } else {
-        #[cfg(target_os = "openbsd")]
-        openbsd::pledge!("stdio inet", "")?;
-    };
+    }
 
     let s = Arc::clone(&storage);
     tokio::spawn(async move {
@@ -192,8 +179,10 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         .with_single_cert(cert, key)?;
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
     let wp_listen_addr = format!("{}:443", config.wp_listen_on);
+    let listener = TcpListener::bind(&wp_listen_addr).await?;
     log::info!("serving peer discovery @{wp_listen_addr:?}");
-    let listener = TcpListener::bind(wp_listen_addr).await?;
+    #[cfg(target_os = "openbsd")]
+    lockdown::step2(cli.monitor)?;
 
     loop {
         let (socket, peer_addr) = match listener.accept().await {

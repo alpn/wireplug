@@ -14,6 +14,7 @@ clap = "4.5.41"
 toml = "0.9.3"
 anyhow = "1.0.98"
 log = "0.4.27"
+libc = "0.2.178"
 
 [target.'cfg(target_os = "openbsd")'.dependencies]
 openbsd = { git = "https://github.com/joshua-cooper/openbsd-rs", version = "0.1.2" }

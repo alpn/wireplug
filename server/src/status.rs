@@ -5,7 +5,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-pub static MON_SOCK: &str = "/var/run/wireplugd.sock";
+pub static MON_SOCK: &str = "/var/run/wpcod/wpcod.sock";
 use crate::Storage;
 
 pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
