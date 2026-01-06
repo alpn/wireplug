@@ -26,7 +26,7 @@ pub mod status;
 pub mod stun;
 
 #[derive(Parser)]
-#[command(version, name="wireplugd", about="", long_about = None)]
+#[command(version, name="wpcod", about="", long_about = None)]
 struct Cli {
     #[arg(short, long, help = "do not daemonize")]
     debug: bool,
