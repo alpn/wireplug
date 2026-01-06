@@ -55,6 +55,9 @@ ip link add dev wg0 type wireguard
 sudo wireplugd wg0 --generate-config
 ```
 
+The public key associated with your new private key will also appear in the config file.
+Share this public key with your respective peers.
+
 3. Edit the config file `/etc/wireplugd.wg0` as needed.
 
 4. Run `wireplugd`:
@@ -76,6 +79,9 @@ brew install wireguard-go
 # This requires root access to write the config file to /etc
 sudo wireplugd wg0 --generate-config
 ```
+
+The public key associated with your new private key will also appear in the config file.
+Share this public key with your respective peers.
 
 3. Edit the config file `/etc/wireplugd.wg0` as needed.
 
