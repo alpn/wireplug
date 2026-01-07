@@ -212,11 +212,6 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     }
 }
 
-#[cfg(target_os = "openbsd")]
-unsafe extern "C" {
-    fn daemon(nochdir: i32, noclose: i32) -> i32;
-}
-
 fn main() {
     let cli = Cli::parse();
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -226,11 +221,9 @@ fn main() {
 
     #[cfg(target_os = "openbsd")]
     if !cli.debug {
-        unsafe {
-            if daemon(0, 0) == -1 {
-                eprintln!("daemon(3) failed");
-                std::process::exit(1);
-            }
+        if let Err(e) = shared::daemonize() {
+            eprintln!("{}", e);
+            std::process::exit(1);
         }
     }
 

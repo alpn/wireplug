@@ -1,3 +1,5 @@
+use std::io;
+
 use bincode::config::Configuration;
 use chrono::Utc;
 use colored::Colorize;
@@ -48,4 +50,15 @@ impl Log for TmpLogger {
     }
 
     fn flush(&self) {}
+}
+
+unsafe extern "C" {
+    fn daemon(nochdir: i32, noclose: i32) -> i32;
+}
+
+pub fn daemonize() -> std::io::Result<()> {
+    match unsafe { daemon(0, 0) } {
+        0 => Ok(()),
+        _ => Err(io::Error::other("daemon(3) failed")),
+    }
 }
