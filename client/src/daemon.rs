@@ -53,6 +53,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     let peer_is_inactive_duration = Duration::from_secs(25);
     let mut next_inactivity_check = Instant::now() + peer_is_inactive_duration;
     let mut inactive_peers = vec![];
+    let mut port_to_announce = 0;
     loop {
         match netmon.status() {
             netstat::NetStatus::Online | netstat::NetStatus::ChangedToPrev => (),
@@ -62,7 +63,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             }
             netstat::NetStatus::ChangedToNew => {
                 let new_port = utils::get_random_port();
-                let observed_port = match traverse_nat {
+                port_to_announce = match traverse_nat {
                     true => match nat::get_observed_port(new_port) {
                         Some(port) => port,
                         None => {
@@ -73,10 +74,10 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                     false => new_port,
                 };
 
-                log::debug!("updating listen port to {observed_port} ..");
+                log::debug!("updating listen port to {new_port} ..");
                 // wait before reusing the port
                 std::thread::sleep(Duration::from_secs(3));
-                wg_interface::update_port(ifname, observed_port)?;
+                wg_interface::update_port(ifname, new_port)?;
 
                 inactive_peers = wg_interface::get_all_peers(ifname)?;
                 next_inactivity_check += peer_is_inactive_duration;
@@ -90,8 +91,6 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         }
         if !inactive_peers.is_empty() {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
-            let port_to_announce =
-                wg_interface::get_port(ifname).context("listen port is not set")?;
             handle_inactive_peers(
                 ifname,
                 &mut peers_manager,

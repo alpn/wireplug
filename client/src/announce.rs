@@ -4,7 +4,8 @@ use shared::{
 };
 use std::{
     io::{Read, Write},
-    net::TcpStream, time::Duration,
+    net::TcpStream,
+    time::Duration,
 };
 use wireguard_control::{Backend, Device, Key};
 
