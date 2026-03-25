@@ -1,7 +1,7 @@
 use bincode::{Decode, Encode};
 use std::{collections::HashMap, net::SocketAddr};
 
-const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V1";
+const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V0.0.2";
 
 fn is_valid_wgkey(s: &str) -> bool {
     if s.len() != 44 {
@@ -22,6 +22,7 @@ pub struct WireplugAnnouncement {
     pub peer_pubkeys: Vec<String>,
     pub listen_port: u16,
     pub lan_addrs: Option<Vec<String>>,
+    pub needs_relay: bool,
 }
 
 impl WireplugAnnouncement {
@@ -30,6 +31,7 @@ impl WireplugAnnouncement {
         peer_pubkeys: Vec<String>,
         listen_port: u16,
         lan_addrs: Option<Vec<String>>,
+        need_relay: bool,
     ) -> Self {
         WireplugAnnouncement {
             proto: String::from(WIREPLUG_PROTOCOL_VERSION),
@@ -37,6 +39,7 @@ impl WireplugAnnouncement {
             peer_pubkeys,
             listen_port,
             lan_addrs,
+            needs_relay: need_relay,
         }
     }
     pub fn valid(&self) -> bool {
