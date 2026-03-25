@@ -50,7 +50,7 @@ impl WireplugAnnouncement {
     }
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(Clone, Encode, Decode, PartialEq, Debug)]
 pub enum WireplugEndpoint {
     Unknown,
     LocalNetwork {
