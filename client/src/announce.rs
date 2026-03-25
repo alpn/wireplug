@@ -49,6 +49,7 @@ pub(crate) fn announce(
     peers: &[Key],
     announcement_port: u16,
     lan_addrs: &Option<Vec<String>>,
+    needs_relay: bool,
 ) -> Result<WireplugResponse, std::io::Error> {
     let iface = if_name.parse()?;
     let device = Device::get(&iface, Backend::default())?;
@@ -70,6 +71,7 @@ pub(crate) fn announce(
         peers.iter().map(|p| p.to_base64()).collect(),
         announcement_port,
         lan_addrs.to_owned(),
+        needs_relay,
     );
 
     let response = send_announcement(&mut stream, announcement)?;

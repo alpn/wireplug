@@ -75,7 +75,8 @@ impl NetworkMonitor {
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
         self.hard_nat = hard_nat;
     }
-    pub fn status(&mut self) -> NetStatus {
+
+    pub fn check_status(&mut self) -> NetStatus {
         let new_info = NetInfo::detect();
         log::trace!("Network: {new_info:?}");
 
@@ -106,5 +107,9 @@ impl NetworkMonitor {
         self.current = new_info;
         self.hard_nat = false;
         NetStatus::ChangedToNew
+    }
+
+    pub(crate) fn needs_relay(&self) -> bool {
+        self.hard_nat
     }
 }

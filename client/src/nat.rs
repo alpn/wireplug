@@ -47,7 +47,7 @@ fn send_stun_request(
     Ok(response)
 }
 
-fn detect_port_mapping(local_port: u16) -> Result<NatKind, std::io::Error> {
+pub fn detect_kind(local_port: u16) -> Result<NatKind, std::io::Error> {
     let stun1 = (shared::WIREPLUG_ORG_STUN1, shared::WIREPLUG_STUN_PORT)
         .to_socket_addrs()?
         .next()
@@ -86,26 +86,4 @@ fn detect_port_mapping(local_port: u16) -> Result<NatKind, std::io::Error> {
         }
     };
     Ok(nat)
-}
-
-pub fn get_observed_port(port: u16) -> Option<u16> {
-    log::trace!("get_observed_port({port})");
-    let nat = match detect_port_mapping(port) {
-        Ok(nat) => nat,
-        Err(e) => {
-            log::error!("NAT dection failed: {e}");
-            return None;
-        }
-    };
-
-    log::debug!("NAT: {nat:?}");
-    match nat {
-        NatKind::Easy => Some(port),
-        NatKind::FixedPortMapping(port_mapping_nat) => Some(port_mapping_nat.obsereved_port),
-        NatKind::Hard => {
-            log::trace!("Destination-Dependent NAT detected");
-            log::warn!("NAT traversal failed");
-            None
-        }
-    }
 }

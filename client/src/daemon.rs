@@ -17,11 +17,12 @@ pub(crate) fn handle_inactive_peers(
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
     port_to_announce: u16,
+    needs_relay: bool,
 ) -> anyhow::Result<()> {
     let lan_addrs = utils::get_lan_addrs(ifname).ok();
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
-        match announce::announce(ifname, peers, port_to_announce, &lan_addrs) {
+        match announce::announce(ifname, peers, port_to_announce, &lan_addrs, needs_relay) {
             Ok(response) => {
                 let peers_updated =
                     wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;
@@ -48,14 +49,14 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     let mut peers_manager = wg_interface::PeerTracker::new();
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 
-    log::info!("monitoring interface: {ifname} with NAT travesal={traverse_nat}");
+    log::info!("monitoring interface: {ifname} | NAT travesal={traverse_nat}");
 
     let peer_is_inactive_duration = Duration::from_secs(25);
     let mut next_inactivity_check = Instant::now() + peer_is_inactive_duration;
     let mut inactive_peers = vec![];
     let mut port_to_announce = 0;
     loop {
-        match netmon.status() {
+        match netmon.check_status() {
             netstat::NetStatus::Online | netstat::NetStatus::ChangedToPrev => (),
             netstat::NetStatus::Offline | netstat::NetStatus::HardNat => {
                 thread::sleep(Duration::from_secs(5));
@@ -64,11 +65,15 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             netstat::NetStatus::ChangedToNew => {
                 let new_port = utils::get_random_port();
                 port_to_announce = match traverse_nat {
-                    true => match nat::get_observed_port(new_port) {
-                        Some(port) => port,
-                        None => {
+                    true => match nat::detect_kind(new_port)? {
+                        nat::NatKind::Easy => new_port,
+                        nat::NatKind::FixedPortMapping(port_mapping_nat) => {
+                            port_mapping_nat.obsereved_port
+                        }
+                        nat::NatKind::Hard => {
+                            log::warn!("Destination-Dependent NAT detected");
                             netmon.set_hard_nat(true);
-                            continue;
+                            new_port
                         }
                     },
                     false => new_port,
@@ -96,6 +101,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 &mut peers_manager,
                 &mut inactive_peers,
                 port_to_announce,
+                netmon.needs_relay(),
             )?;
         } else {
             wg_interface::show_peers(ifname)?;
