@@ -11,6 +11,7 @@ pub const WIREPLUG_STUN_PORT: u16 = 4455;
 pub const WIREPLUG_ORG_STUN1: &str = "stun1.wireplug.org";
 pub const WIREPLUG_ORG_STUN2: &str = "stun2.wireplug.org";
 pub const WIREPLUG_ORG_WP: &str = "a.wireplug.org";
+pub const WIREPLUG_ORG_RELAY: &str = "relay.wireplug.org";
 
 pub const MAX_MESSAGE_SIZE: usize = 4096;
 pub const BINCODE_CONFIG: Configuration<

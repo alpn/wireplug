@@ -2,7 +2,7 @@
 use std::io;
 use std::{
     collections::HashMap,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, SocketAddr, ToSocketAddrs},
     str::FromStr,
     time::{Duration, SystemTime},
 };
@@ -315,6 +315,16 @@ pub(crate) fn update_peers(
             protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
                 log::debug!("wireplug.org: {peer} is @{wan_addr}");
                 if update_peer(&iface, peer_tracker, &peer_pubkey, wan_addr)? {
+                    peers_updated.push(peer_pubkey);
+                }
+            }
+            protocol::WireplugEndpoint::Relay(port) => {
+                let relay = (shared::WIREPLUG_ORG_RELAY, port)
+                    .to_socket_addrs()?
+                    .next()
+                    .expect("could not resolve relay address");
+                log::debug!("wireplug.org: {peer} is relayed by wireplug.org");
+                if update_peer(&iface, peer_tracker, &peer_pubkey, relay)? {
                     peers_updated.push(peer_pubkey);
                 }
             }
