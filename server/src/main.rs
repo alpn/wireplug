@@ -22,6 +22,7 @@ use openbsd::{pledge, unveil};
 pub mod config;
 #[cfg(target_os = "openbsd")]
 pub mod lockdown;
+pub mod relay;
 pub mod status;
 pub mod stun;
 
@@ -35,10 +36,30 @@ struct Cli {
 }
 
 #[derive(Clone)]
+pub(crate) enum ConnectionType {
+    P2P(u16),
+    //Relay(relay::Relay)
+    Relay(HashMap<String, u16>),
+}
+
+#[derive(Clone)]
+struct RelayEndpoint {
+    id: usize,
+    port: u16,
+}
+
+impl RelayEndpoint {
+    fn new(port: u16) -> Self {
+        Self { id: 0, port }
+    }
+}
+
+#[derive(Clone)]
 struct Record {
     pub wan_addr: SocketAddr,
     pub lan_addrs: Option<Vec<String>>,
     pub timestamp: SystemTime,
+    pub relay_endpoint: Option<RelayEndpoint>,
 }
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
@@ -72,26 +93,12 @@ where
         return Ok(());
     }
 
-    let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
-    {
-        let mut storage_writer = storage.write().await;
-        for peer in &announcement.peer_pubkeys {
-            storage_writer.insert(
-                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
-                Record {
-                    wan_addr: peer_wg_wan_addr,
-                    lan_addrs: announcement.lan_addrs.to_owned(),
-                    timestamp: SystemTime::now(),
-                },
-            );
-        }
-    }
-
     let mut res_peers = HashMap::new();
+    let mut relays_needed = HashMap::new();
     {
         let storage_reader = storage.read().await;
 
-        for peer in announcement.peer_pubkeys {
+        for peer in &announcement.peer_pubkeys {
             let peer_endpoint = match storage_reader
                 .get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned()))
             {
@@ -102,7 +109,17 @@ where
                             listen_port: record.wan_addr.port(),
                         }
                     } else {
-                        WireplugEndpoint::RemoteNetwork(record.wan_addr)
+                        if announcement.needs_relay {
+                            relays_needed.insert(peer.to_owned(), record.wan_addr);
+                            WireplugEndpoint::Relay(record.wan_addr.port())
+                        } else {
+                            // The announcing peer doesn't need a relay, but the other peer does
+                            if let Some(e) = &record.relay_endpoint {
+                                WireplugEndpoint::Relay(e.port)
+                            } else {
+                                WireplugEndpoint::RemoteNetwork(record.wan_addr)
+                            }
+                        }
                     }
                 }
                 None => WireplugEndpoint::Unknown,
@@ -110,6 +127,7 @@ where
             res_peers.insert(peer.to_owned(), peer_endpoint);
         }
     }
+
     let response = WireplugResponse::from_peer_endpoints(res_peers);
     let encoded_message = bincode::encode_to_vec(&response, BINCODE_CONFIG)?;
     let encoded_size_bytes: [u8; 4] = u32::try_from(encoded_message.len())?.to_le_bytes();
@@ -118,6 +136,40 @@ where
     stream.write_all(&encoded_message).await?;
 
     stream.shutdown().await?;
+
+    let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
+    if announcement.needs_relay {
+        log::debug!("{} needs realy!", announcement.initiator_pubkey);
+        let relays = relay::get_relays(&peer_addr.ip(), relays_needed)
+            .await
+            .unwrap();
+
+        let mut storage_writer = storage.write().await;
+        for (peer, port) in relays {
+            storage_writer.insert(
+                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
+                Record {
+                    wan_addr: peer_wg_wan_addr,
+                    lan_addrs: announcement.lan_addrs.to_owned(),
+                    timestamp: SystemTime::now(),
+                    relay_endpoint: Some(RelayEndpoint::new(port)),
+                },
+            );
+        }
+    } else {
+        let mut storage_writer = storage.write().await;
+        for peer in &announcement.peer_pubkeys {
+            storage_writer.insert(
+                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
+                Record {
+                    wan_addr: peer_wg_wan_addr,
+                    lan_addrs: announcement.lan_addrs.to_owned(),
+                    timestamp: SystemTime::now(),
+                    relay_endpoint: None,
+                },
+            );
+        }
+    }
 
     Ok(())
 }
