@@ -61,6 +61,22 @@ struct Record {
     pub timestamp: SystemTime,
     pub relay_endpoint: Option<RelayEndpoint>,
 }
+
+impl Record {
+    fn new(
+        wan_addr: SocketAddr,
+        lan_addrs: Option<Vec<String>>,
+        timestamp: SystemTime,
+        relay_endpoint: Option<RelayEndpoint>,
+    ) -> Self {
+        Self {
+            wan_addr,
+            lan_addrs,
+            timestamp,
+            relay_endpoint,
+        }
+    }
+}
 type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
@@ -148,12 +164,12 @@ where
         for (peer, port) in relays {
             storage_writer.insert(
                 (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
-                Record {
-                    wan_addr: peer_wg_wan_addr,
-                    lan_addrs: announcement.lan_addrs.to_owned(),
-                    timestamp: SystemTime::now(),
-                    relay_endpoint: Some(RelayEndpoint::new(port)),
-                },
+                Record::new(
+                    peer_wg_wan_addr,
+                    announcement.lan_addrs.to_owned(),
+                    SystemTime::now(),
+                    Some(RelayEndpoint::new(port)),
+                ),
             );
         }
     } else {
@@ -161,12 +177,12 @@ where
         for peer in &announcement.peer_pubkeys {
             storage_writer.insert(
                 (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
-                Record {
-                    wan_addr: peer_wg_wan_addr,
-                    lan_addrs: announcement.lan_addrs.to_owned(),
-                    timestamp: SystemTime::now(),
-                    relay_endpoint: None,
-                },
+                Record::new(
+                    peer_wg_wan_addr,
+                    announcement.lan_addrs.to_owned(),
+                    SystemTime::now(),
+                    None,
+                ),
             );
         }
     }
