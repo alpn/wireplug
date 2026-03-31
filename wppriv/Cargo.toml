@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.5.41", features = ["derive"] }
+tokio = { version = "1.50.0", features = ["rt"] }
+
+[target.'cfg(target_os = "openbsd")'.dependencies]
+openbsd = { git = "https://github.com/joshua-cooper/openbsd-rs", version = "0.1.2" }
