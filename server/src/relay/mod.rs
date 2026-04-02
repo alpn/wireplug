@@ -11,14 +11,20 @@ pub struct Relay {
     pub a_oport: u16,
     b_ip: IpAddr,
     b_oport: u16,
-    relay_ip: IpAddr
+    relay_ip: IpAddr,
 }
 
 impl Relay {
     pub fn new(a_ip: IpAddr, a_oport: u16, b_ip: IpAddr, b_oport: u16, relay_ip: IpAddr) -> Self {
-        Self { a_ip, a_oport, b_ip, b_oport, relay_ip }
+        Self {
+            a_ip,
+            a_oport,
+            b_ip,
+            b_oport,
+            relay_ip,
+        }
     }
-    
+
     pub fn write_rules<Write: std::io::Write>(&self, writer: &mut Write) -> std::io::Result<()> {
         let rdr_to_1 = format!(
             //"pass in proto udp from {} port {} to {} port {} rdr-to {}\n",
@@ -68,7 +74,13 @@ pub(crate) async fn get_relays(
         .iter()
         .for_each(|(peer, peer_endpoint, observed_source_port)| {
             if let Some(port) = observed_source_port {
-                let relay = Relay::new(*ip, *port, peer_endpoint.ip(), peer_endpoint.port(),"1.1.1.1".parse().unwrap());
+                let relay = Relay::new(
+                    *ip,
+                    *port,
+                    peer_endpoint.ip(),
+                    peer_endpoint.port(),
+                    "1.1.1.1".parse().unwrap(),
+                );
                 res.insert(peer.to_owned(), relay);
             }
         });
