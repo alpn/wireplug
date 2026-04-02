@@ -89,8 +89,14 @@ main(const int argc, const char *argv[]) {
     ssize_t sz;
 	int fd, snaplen, res = 1;
 
-    if(argc != 5)
+	if (argc != 5)
 		err(1, "args");
+
+	if (unveil("/dev/bpf" ,"r") == -1)
+		err(1, "unveil");
+
+	if (unveil(NULL, NULL) == -1)
+		err(1, "unveil");
 
 	const char* if_name = argv[1];
 	const char* rly_ip = argv[2];
