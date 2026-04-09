@@ -155,7 +155,7 @@ where
 
     let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
     if announcement.needs_relay {
-        log::debug!("{} needs realy!", announcement.initiator_pubkey);
+        log::debug!("{} needs relay!", announcement.initiator_pubkey);
         let relays = relay::get_relays(&peer_addr.ip(), relays_needed)
             .await
             .unwrap();
