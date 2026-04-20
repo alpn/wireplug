@@ -318,7 +318,7 @@ pub(crate) fn update_peers(
                     peers_updated.push(peer_pubkey);
                 }
             }
-            protocol::WireplugEndpoint::Relay(port) => {
+            protocol::WireplugEndpoint::Relay { id: _id, port } => {
                 let relay = (shared::WIREPLUG_ORG_RELAY, port)
                     .to_socket_addrs()?
                     .next()
