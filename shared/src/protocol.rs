@@ -58,7 +58,10 @@ pub enum WireplugEndpoint {
         listen_port: u16,
     },
     RemoteNetwork(SocketAddr),
-    Relay(u16),
+    Relay {
+        id: usize,
+        port: u16,
+    },
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
