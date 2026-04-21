@@ -7,7 +7,7 @@ pub(crate) async fn detect_source_port(ip: &IpAddr, peer_port: u16) -> std::io::
     let socket = UdpSocket::bind(bind_to).await?;
     let mut buf = [0u8; 1024];
     for _ in 1..RETRIES {
-        let (len, addr) = socket.recv_from(&mut buf).await?;
+        let (_len, addr) = socket.recv_from(&mut buf).await?;
         if addr.ip() != *ip {
             continue;
         }

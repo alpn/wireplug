@@ -6,9 +6,12 @@ use std::{
 };
 
 pub static MON_SOCK: &str = "/var/run/wpcod/wpcod.sock";
-use crate::Storage;
+use crate::{SharedRelayManager, SharedStorage};
 
-pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
+pub(crate) async fn start_writer(
+    storage: SharedStorage,
+    relay_manager: SharedRelayManager,
+) -> anyhow::Result<()> {
     let mut prev_ok = true;
     loop {
         let mut writer = String::new();
@@ -16,7 +19,7 @@ pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
         writeln!(writer, "\n\nPeers:\n-----")?;
         let now = SystemTime::now();
         {
-            for p in storage.read().await.iter() {
+            for p in storage.read().await.peering_records.iter() {
                 let peer_a = &p.0.0;
                 let peer_b = &p.0.1;
                 let ip = p.1.wan_addr;
@@ -24,6 +27,10 @@ pub(crate) async fn start_writer(storage: Storage) -> anyhow::Result<()> {
                 let sec = now.duration_since(*timestamp)?.as_secs();
                 writeln!(writer, "\t{peer_a} @{ip} -> {peer_b} | {sec} sec ago")?;
             }
+        }
+        writeln!(writer, "\n\nRelays:\n------")?;
+        {
+            relay_manager.read().await.debug(&mut writer)?;
         }
         match UnixStream::connect(MON_SOCK) {
             Ok(mut unix_stream) => {

@@ -19,6 +19,8 @@ use tokio_rustls::{TlsAcceptor, rustls};
 #[cfg(target_os = "openbsd")]
 use openbsd::{pledge, unveil};
 
+use crate::relay::{RelayKind, RelayManager};
+
 pub mod config;
 #[cfg(target_os = "openbsd")]
 pub mod lockdown;
@@ -36,30 +38,11 @@ struct Cli {
 }
 
 #[derive(Clone)]
-pub(crate) enum ConnectionType {
-    P2P(u16),
-    //Relay(relay::Relay)
-    Relay(HashMap<String, u16>),
-}
-
-#[derive(Clone)]
-struct RelayEndpoint {
-    id: usize,
-    port: u16,
-}
-
-impl RelayEndpoint {
-    fn new(port: u16) -> Self {
-        Self { id: 0, port }
-    }
-}
-
-#[derive(Clone)]
 struct Record {
     pub wan_addr: SocketAddr,
     pub lan_addrs: Option<Vec<String>>,
     pub timestamp: SystemTime,
-    pub relay_endpoint: Option<RelayEndpoint>,
+    pub needs_relay: bool,
 }
 
 impl Record {
@@ -67,25 +50,41 @@ impl Record {
         wan_addr: SocketAddr,
         lan_addrs: Option<Vec<String>>,
         timestamp: SystemTime,
-        relay_endpoint: Option<RelayEndpoint>,
+        needs_relay: bool,
     ) -> Self {
         Self {
             wan_addr,
             lan_addrs,
             timestamp,
-            relay_endpoint,
+            needs_relay,
         }
     }
 }
-type Storage = Arc<RwLock<HashMap<(String, String), Record>>>;
+
+type PeeringRecords = HashMap<(String, String), Record>;
+struct Storage {
+    peering_records: PeeringRecords,
+}
+
+impl Storage {
+    fn new() -> Self {
+        Self {
+            peering_records: HashMap::new(),
+        }
+    }
+}
+
+type SharedStorage = Arc<RwLock<Storage>>;
+type SharedRelayManager = Arc<RwLock<RelayManager>>;
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 static LOGGER: TmpLogger = TmpLogger;
 
 async fn handle_connection<S>(
     mut stream: S,
-    peer_addr: SocketAddr,
-    storage: Storage,
+    announcing_peer_addr: SocketAddr,
+    storage: SharedStorage,
+    relay_manager: SharedRelayManager,
 ) -> anyhow::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
@@ -110,35 +109,67 @@ where
     }
 
     let mut res_peers = HashMap::new();
-    let mut relays_needed = HashMap::new();
     {
         let storage_reader = storage.read().await;
+        let mut relay_manager = relay_manager.write().await;
 
         for peer in &announcement.peer_pubkeys {
             let peer_endpoint = match storage_reader
+                .peering_records
                 .get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned()))
             {
                 Some(record) => {
-                    if peer_addr.ip() == record.wan_addr.ip() {
+                    if announcing_peer_addr.ip() == record.wan_addr.ip() {
                         WireplugEndpoint::LocalNetwork {
                             lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
                             listen_port: record.wan_addr.port(),
                         }
-                    } else {
-                        if announcement.needs_relay {
-                            relays_needed.insert(peer.to_owned(), record.wan_addr);
-                            WireplugEndpoint::Relay(record.wan_addr.port())
-                        } else {
-                            // The announcing peer doesn't need a relay, but the other peer does
-                            if let Some(e) = &record.relay_endpoint {
-                                WireplugEndpoint::Relay(e.port)
-                            } else {
-                                WireplugEndpoint::RemoteNetwork(record.wan_addr)
+                    } else if announcement.needs_relay || record.needs_relay {
+                        let relay_port = match relay_manager.get_relay_port(
+                            &announcement.initiator_pubkey,
+                            peer,
+                            announcing_peer_addr.ip(),
+                        ) {
+                            RelayKind::Proto(p) => {
+                                log::trace!("Proto Relay port:{p}");
+                                p
                             }
+                            RelayKind::Pending(p) => {
+                                log::trace!("Pending Relay port:{p}");
+                                p
+                            }
+                            RelayKind::Established(p) => {
+                                log::trace!("Established Relay port:{p}");
+                                p
+                            }
+                        };
+                        WireplugEndpoint::Relay {
+                            id: 1,
+                            port: relay_port,
                         }
+                    } else {
+                        WireplugEndpoint::RemoteNetwork(record.wan_addr)
                     }
                 }
-                None => WireplugEndpoint::Unknown,
+                None => {
+                    if announcement.needs_relay {
+                        let relay_port = match relay_manager.get_relay_port(
+                            &announcement.initiator_pubkey,
+                            peer,
+                            announcing_peer_addr.ip(),
+                        ) {
+                            RelayKind::Proto(p) => p,
+                            RelayKind::Pending(p) => p,
+                            _ => todo!(), // error
+                        };
+                        WireplugEndpoint::Relay {
+                            id: 1,
+                            port: relay_port,
+                        }
+                    } else {
+                        WireplugEndpoint::Unknown
+                    }
+                }
             };
             res_peers.insert(peer.to_owned(), peer_endpoint);
         }
@@ -153,35 +184,17 @@ where
 
     stream.shutdown().await?;
 
-    let peer_wg_wan_addr = SocketAddr::new(peer_addr.ip(), announcement.listen_port);
-    if announcement.needs_relay {
-        log::debug!("{} needs relay!", announcement.initiator_pubkey);
-        let relays = relay::get_relays(&peer_addr.ip(), relays_needed)
-            .await
-            .unwrap();
-
-        let mut storage_writer = storage.write().await;
-        for (peer, port) in relays {
-            storage_writer.insert(
-                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
-                Record::new(
-                    peer_wg_wan_addr,
-                    announcement.lan_addrs.to_owned(),
-                    SystemTime::now(),
-                    Some(RelayEndpoint::new(port)),
-                ),
-            );
-        }
-    } else {
+    let peer_wg_wan_addr = SocketAddr::new(announcing_peer_addr.ip(), announcement.listen_port);
+    {
         let mut storage_writer = storage.write().await;
         for peer in &announcement.peer_pubkeys {
-            storage_writer.insert(
+            storage_writer.peering_records.insert(
                 (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
                 Record::new(
                     peer_wg_wan_addr,
                     announcement.lan_addrs.to_owned(),
                     SystemTime::now(),
-                    None,
+                    announcement.needs_relay,
                 ),
             );
         }
@@ -204,12 +217,14 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let cert = CertificateDer::pem_file_iter(&cert_path)?.collect::<Result<Vec<_>, _>>()?;
     let key = PrivateKeyDer::from_pem_file(&key_path)?;
 
-    let storage: Storage = Arc::new(RwLock::new(HashMap::new()));
+    let storage: SharedStorage = Arc::new(RwLock::new(Storage::new()));
+    let relay_manager = Arc::new(RwLock::new(relay::RelayManager::new()));
 
     if cli.monitor {
         let s = Arc::clone(&storage);
+        let rm = Arc::clone(&relay_manager);
         tokio::spawn(async move {
-            if let Err(e) = status::start_writer(s).await {
+            if let Err(e) = status::start_writer(s, rm).await {
                 log::error!("{e}");
             }
         });
@@ -220,7 +235,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         loop {
             async {
                 let now = SystemTime::now();
-                s.write().await.retain(|_, record| {
+                s.write().await.peering_records.retain(|_, record| {
                     if let Ok(record_duration) = now.duration_since(record.timestamp)
                         && record_duration < Duration::from_secs(RECORD_TIMEOUT_SEC)
                     {
@@ -262,6 +277,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         };
         let acceptor = acceptor.clone();
         let s = Arc::clone(&storage);
+        let rm = Arc::clone(&relay_manager);
 
         tokio::spawn(async move {
             let stream = match acceptor.accept(socket).await {
@@ -273,7 +289,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
             };
 
             log::info!("handling request over TLS from {peer_addr:?}");
-            if let Err(e) = handle_connection(stream, peer_addr, s).await {
+            if let Err(e) = handle_connection(stream, peer_addr, s, rm).await {
                 log::error!("{e}");
             }
         });
