@@ -1,12 +1,12 @@
 use std::fmt::Write as OtherWrite;
-use std::io::Write;
-use std::{
-    os::unix::net::UnixStream,
-    time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime};
+
+use tokio::io::AsyncWriteExt;
+use tokio::net::UnixStream;
+
+use crate::{SharedRelayManager, SharedStorage};
 
 pub static MON_SOCK: &str = "/var/run/wpcod/wpcod.sock";
-use crate::{SharedRelayManager, SharedStorage};
 
 pub(crate) async fn start_writer(
     storage: SharedStorage,
@@ -32,9 +32,9 @@ pub(crate) async fn start_writer(
         {
             relay_manager.read().await.debug(&mut writer)?;
         }
-        match UnixStream::connect(MON_SOCK) {
+        match UnixStream::connect(MON_SOCK).await {
             Ok(mut unix_stream) => {
-                if let Err(e) = unix_stream.write_all(writer.as_bytes()) {
+                if let Err(e) = unix_stream.write_all(writer.as_bytes()).await {
                     log::warn!("monitoring socket: {e}");
                 } else {
                     prev_ok = true;
