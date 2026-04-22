@@ -1,11 +1,10 @@
 use clap::Parser;
-use shared::protocol::{WireplugEndpoint, WireplugResponse};
-use std::collections::HashMap;
+use shared::protocol::WireplugResponse;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
 use shared::{BINCODE_CONFIG, TmpLogger, protocol};
@@ -19,11 +18,13 @@ use tokio_rustls::{TlsAcceptor, rustls};
 #[cfg(target_os = "openbsd")]
 use openbsd::{pledge, unveil};
 
-use crate::relay::{RelayKind, RelayManager};
+use crate::peering::{SharedStorage, Storage};
+use crate::relay::SharedRelayManager;
 
 pub mod config;
 #[cfg(target_os = "openbsd")]
 pub mod lockdown;
+pub mod peering;
 pub mod relay;
 pub mod status;
 pub mod stun;
@@ -37,53 +38,13 @@ struct Cli {
     monitor: bool,
 }
 
-#[derive(Clone)]
-struct Record {
-    pub wan_addr: SocketAddr,
-    pub lan_addrs: Option<Vec<String>>,
-    pub timestamp: SystemTime,
-    pub needs_relay: bool,
-}
-
-impl Record {
-    fn new(
-        wan_addr: SocketAddr,
-        lan_addrs: Option<Vec<String>>,
-        timestamp: SystemTime,
-        needs_relay: bool,
-    ) -> Self {
-        Self {
-            wan_addr,
-            lan_addrs,
-            timestamp,
-            needs_relay,
-        }
-    }
-}
-
-type PeeringRecords = HashMap<(String, String), Record>;
-struct Storage {
-    peering_records: PeeringRecords,
-}
-
-impl Storage {
-    fn new() -> Self {
-        Self {
-            peering_records: HashMap::new(),
-        }
-    }
-}
-
-type SharedStorage = Arc<RwLock<Storage>>;
-type SharedRelayManager = Arc<RwLock<RelayManager>>;
-
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 static LOGGER: TmpLogger = TmpLogger;
 
 async fn handle_connection<S>(
     mut stream: S,
     announcing_peer_addr: SocketAddr,
-    storage: SharedStorage,
+    storage: peering::SharedStorage,
     relay_manager: SharedRelayManager,
 ) -> anyhow::Result<()>
 where
@@ -108,72 +69,9 @@ where
         return Ok(());
     }
 
-    let mut res_peers = HashMap::new();
-    {
-        let storage_reader = storage.read().await;
-        let mut relay_manager = relay_manager.write().await;
-
-        for peer in &announcement.peer_pubkeys {
-            let peer_endpoint = match storage_reader
-                .peering_records
-                .get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned()))
-            {
-                Some(record) => {
-                    if announcing_peer_addr.ip() == record.wan_addr.ip() {
-                        WireplugEndpoint::LocalNetwork {
-                            lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
-                            listen_port: record.wan_addr.port(),
-                        }
-                    } else if announcement.needs_relay || record.needs_relay {
-                        let relay_port = match relay_manager.get_relay_port(
-                            &announcement.initiator_pubkey,
-                            peer,
-                            announcing_peer_addr.ip(),
-                        ) {
-                            RelayKind::Proto(p) => {
-                                log::trace!("Proto Relay port:{p}");
-                                p
-                            }
-                            RelayKind::Pending(p) => {
-                                log::trace!("Pending Relay port:{p}");
-                                p
-                            }
-                            RelayKind::Established(p) => {
-                                log::trace!("Established Relay port:{p}");
-                                p
-                            }
-                        };
-                        WireplugEndpoint::Relay {
-                            id: 1,
-                            port: relay_port,
-                        }
-                    } else {
-                        WireplugEndpoint::RemoteNetwork(record.wan_addr)
-                    }
-                }
-                None => {
-                    if announcement.needs_relay {
-                        let relay_port = match relay_manager.get_relay_port(
-                            &announcement.initiator_pubkey,
-                            peer,
-                            announcing_peer_addr.ip(),
-                        ) {
-                            RelayKind::Proto(p) => p,
-                            RelayKind::Pending(p) => p,
-                            _ => todo!(), // error
-                        };
-                        WireplugEndpoint::Relay {
-                            id: 1,
-                            port: relay_port,
-                        }
-                    } else {
-                        WireplugEndpoint::Unknown
-                    }
-                }
-            };
-            res_peers.insert(peer.to_owned(), peer_endpoint);
-        }
-    }
+    let res_peers =
+        peering::get_peer_endpoints(&announcement, announcing_peer_addr, &storage, relay_manager)
+            .await;
 
     let response = WireplugResponse::from_peer_endpoints(res_peers);
     let encoded_message = bincode::encode_to_vec(&response, BINCODE_CONFIG)?;
@@ -184,21 +82,7 @@ where
 
     stream.shutdown().await?;
 
-    let peer_wg_wan_addr = SocketAddr::new(announcing_peer_addr.ip(), announcement.listen_port);
-    {
-        let mut storage_writer = storage.write().await;
-        for peer in &announcement.peer_pubkeys {
-            storage_writer.peering_records.insert(
-                (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
-                Record::new(
-                    peer_wg_wan_addr,
-                    announcement.lan_addrs.to_owned(),
-                    SystemTime::now(),
-                    announcement.needs_relay,
-                ),
-            );
-        }
-    }
+    peering::process_announcement(&announcement, announcing_peer_addr, &storage).await?;
 
     Ok(())
 }
@@ -233,18 +117,9 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let s = Arc::clone(&storage);
     tokio::spawn(async move {
         loop {
-            async {
-                let now = SystemTime::now();
-                s.write().await.peering_records.retain(|_, record| {
-                    if let Ok(record_duration) = now.duration_since(record.timestamp)
-                        && record_duration < Duration::from_secs(RECORD_TIMEOUT_SEC)
-                    {
-                        return true;
-                    }
-                    false
-                });
-            }
-            .await;
+            if let Err(e) = peering::remove_old_records(&s).await {
+                log::error!("{e}");
+            };
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });

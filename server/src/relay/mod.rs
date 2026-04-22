@@ -1,5 +1,6 @@
 use futures::future::join_all;
-use std::{collections::HashMap, fmt::Write, net::IpAddr};
+use std::{collections::HashMap, fmt::Write, net::IpAddr, sync::Arc};
+use tokio::sync::RwLock;
 mod port_mapping;
 
 pub struct ProtoRelay {
@@ -94,6 +95,8 @@ pub struct RelayManager {
     pending: HashMap<(String, String), PendingRelay>,
     established: HashMap<NormalizedKey, EstablishedRelay>,
 }
+
+pub type SharedRelayManager = Arc<RwLock<RelayManager>>;
 
 impl RelayManager {
     pub fn new() -> Self {
