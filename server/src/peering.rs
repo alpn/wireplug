@@ -16,7 +16,7 @@ const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 #[derive(Clone)]
 struct Record {
     pub wan_addr: SocketAddr,
-    pub lan_addrs: Option<Vec<String>>,
+    pub lan_addrs: Vec<String>,
     pub timestamp: SystemTime,
     pub needs_relay: bool,
 }
@@ -24,7 +24,7 @@ struct Record {
 impl Record {
     fn new(
         wan_addr: SocketAddr,
-        lan_addrs: Option<Vec<String>>,
+        lan_addrs: Vec<String>,
         timestamp: SystemTime,
         needs_relay: bool,
     ) -> Self {
@@ -82,7 +82,7 @@ pub(crate) async fn get_peer_endpoints(
             Some(record) => {
                 if announcing_peer_addr.ip() == record.wan_addr.ip() {
                     WireplugEndpoint::LocalNetwork {
-                        lan_addrs: record.lan_addrs.clone().map_or(vec![], |v| v),
+                        lan_addrs: record.lan_addrs.clone(),
                         listen_port: record.wan_addr.port(),
                     }
                 } else if announcement.needs_relay || record.needs_relay {

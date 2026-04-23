@@ -19,7 +19,13 @@ pub(crate) fn handle_inactive_peers(
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {
-    let lan_addrs = utils::get_lan_addrs(ifname).ok();
+    let lan_addrs = match utils::get_lan_addrs(ifname) {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!("could not get LAN addresses: {e}");
+            vec![]
+        }
+    };
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
         match announce::announce(ifname, peers, port_to_announce, &lan_addrs, needs_relay) {

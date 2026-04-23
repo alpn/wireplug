@@ -10,7 +10,7 @@ struct Cli {
     debug: bool,
 }
 
-async fn start(_cli: Cli) -> std::io::Result<()>{
+async fn start(_cli: Cli) -> std::io::Result<()> {
     Ok(())
 }
 
