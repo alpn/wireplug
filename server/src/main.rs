@@ -1,14 +1,11 @@
 use clap::Parser;
-use shared::protocol::WireplugResponse;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-use shared::{BINCODE_CONFIG, TmpLogger, protocol};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use shared::TmpLogger;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 
@@ -26,6 +23,7 @@ pub mod config;
 pub mod lockdown;
 pub mod peering;
 pub mod relay;
+pub mod server;
 pub mod status;
 pub mod stun;
 
@@ -38,54 +36,7 @@ struct Cli {
     monitor: bool,
 }
 
-const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 static LOGGER: TmpLogger = TmpLogger;
-
-async fn handle_connection<S>(
-    mut stream: S,
-    announcing_peer_addr: SocketAddr,
-    storage: peering::SharedStorage,
-    relay_manager: SharedRelayManager,
-) -> anyhow::Result<()>
-where
-    S: AsyncRead + AsyncWrite + Unpin,
-{
-    let encoded_length = usize::try_from(stream.read_u32_le().await?)?;
-    if encoded_length > shared::MAX_MESSAGE_SIZE {
-        return Err(anyhow::anyhow!(
-            "Message size {} exceeds maximum allowed size of {}",
-            encoded_length,
-            shared::MAX_MESSAGE_SIZE
-        ));
-    }
-
-    let mut buffer = [0u8; shared::MAX_MESSAGE_SIZE];
-    stream.read_exact(&mut buffer[0..encoded_length]).await?;
-    let (announcement, _): (protocol::WireplugAnnouncement, usize) =
-        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)?;
-
-    if !announcement.valid() {
-        stream.shutdown().await?;
-        return Ok(());
-    }
-
-    let res_peers =
-        peering::get_peer_endpoints(&announcement, announcing_peer_addr, &storage, relay_manager)
-            .await;
-
-    let response = WireplugResponse::from_peer_endpoints(res_peers);
-    let encoded_message = bincode::encode_to_vec(&response, BINCODE_CONFIG)?;
-    let encoded_size_bytes: [u8; 4] = u32::try_from(encoded_message.len())?.to_le_bytes();
-
-    stream.write_all(&encoded_size_bytes).await?;
-    stream.write_all(&encoded_message).await?;
-
-    stream.shutdown().await?;
-
-    peering::process_announcement(&announcement, announcing_peer_addr, &storage).await?;
-
-    Ok(())
-}
 
 async fn start(cli: Cli) -> anyhow::Result<()> {
     #[cfg(target_os = "openbsd")]
@@ -138,37 +89,14 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
     let wp_listen_addr = format!("{}:443", config.wp_listen_on);
     let listener = TcpListener::bind(&wp_listen_addr).await?;
-    log::info!("serving peer discovery @{wp_listen_addr:?}");
+
     #[cfg(target_os = "openbsd")]
     lockdown::step2(cli.monitor)?;
 
-    loop {
-        let (socket, peer_addr) = match listener.accept().await {
-            Ok(accepted) => accepted,
-            Err(e) => {
-                log::error!("{e}");
-                continue;
-            }
-        };
-        let acceptor = acceptor.clone();
-        let s = Arc::clone(&storage);
-        let rm = Arc::clone(&relay_manager);
+    log::info!("serving peer discovery @{wp_listen_addr:?}");
+    server::serve(listener, acceptor, &storage, relay_manager).await;
 
-        tokio::spawn(async move {
-            let stream = match acceptor.accept(socket).await {
-                Ok(s) => s,
-                Err(e) => {
-                    log::error!("{e}");
-                    return;
-                }
-            };
-
-            log::info!("handling request over TLS from {peer_addr:?}");
-            if let Err(e) = handle_connection(stream, peer_addr, s, rm).await {
-                log::error!("{e}");
-            }
-        });
-    }
+    Ok(())
 }
 
 fn main() {

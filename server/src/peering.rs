@@ -9,10 +9,9 @@ use std::{
 use shared::protocol::{WireplugAnnouncement, WireplugEndpoint};
 use tokio::sync::RwLock;
 
-use crate::{
-    RECORD_TIMEOUT_SEC,
-    relay::{RelayKind, SharedRelayManager},
-};
+use crate::relay::{RelayKind, SharedRelayManager};
+
+const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
 
 #[derive(Clone)]
 struct Record {
