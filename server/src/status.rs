@@ -1,5 +1,5 @@
 use std::fmt::Write as OtherWrite;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
@@ -19,7 +19,7 @@ pub(crate) async fn start_writer(
         writeln!(writer, "\n\nPeers:\n-----")?;
         {
             let s = storage.read().await;
-            s.debug(&mut writer);
+            s.debug(&mut writer)?;
         }
         writeln!(writer, "\n\nRelays:\n------")?;
         {
