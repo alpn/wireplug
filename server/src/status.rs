@@ -4,13 +4,14 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
 
-use crate::{SharedRelayManager, SharedStorage};
+use crate::{SharedRelayManager, SharedStorage, server::SharedServerStats};
 
 pub static MON_SOCK: &str = "/var/run/wpcod/wpcod.sock";
 
 pub(crate) async fn start_writer(
     storage: SharedStorage,
     relay_manager: SharedRelayManager,
+    server_stats: SharedServerStats,
 ) -> anyhow::Result<()> {
     let mut prev_ok = true;
     loop {
@@ -24,6 +25,14 @@ pub(crate) async fn start_writer(
         writeln!(writer, "\n\nRelays:\n------")?;
         {
             relay_manager.read().await.debug(&mut writer)?;
+        }
+        writeln!(writer, "\n\nErrors:\n------")?;
+        {
+            writeln!(
+                writer,
+                "tls: {}",
+                server_stats.read().await.get_tls_errors()
+            )?;
         }
         match UnixStream::connect(MON_SOCK).await {
             Ok(mut unix_stream) => {

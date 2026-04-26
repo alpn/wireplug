@@ -4,14 +4,36 @@ use shared::{
     BINCODE_CONFIG,
     protocol::{self, WireplugResponse},
 };
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    sync::RwLock,
+};
 use tokio_rustls::TlsAcceptor;
 
 use crate::{
     peering::{self, SharedStorage},
     relay::SharedRelayManager,
 };
+
+pub(crate) struct ServerStats {
+    tls_errros: usize,
+}
+
+pub(crate) type SharedServerStats = Arc<RwLock<ServerStats>>;
+
+impl ServerStats {
+    pub(crate) fn new() -> Self {
+        Self { tls_errros: 0 }
+    }
+
+    fn inc_tls_errors(&mut self) {
+        self.tls_errros += 1;
+    }
+    pub fn get_tls_errors(&self) -> usize {
+        self.tls_errros
+    }
+}
 
 async fn handle_connection<S>(
     mut stream: S,
@@ -64,6 +86,7 @@ pub(crate) async fn serve(
     acceptor: TlsAcceptor,
     storage: &SharedStorage,
     relay_manager: SharedRelayManager,
+    server_stats: SharedServerStats,
 ) {
     loop {
         let (socket, peer_addr) = match listener.accept().await {
@@ -76,12 +99,14 @@ pub(crate) async fn serve(
         let acceptor = acceptor.clone();
         let s = Arc::clone(&storage);
         let rm = Arc::clone(&relay_manager);
+        let ss = Arc::clone(&server_stats);
 
         tokio::spawn(async move {
             let stream = match acceptor.accept(socket).await {
                 Ok(s) => s,
                 Err(e) => {
-                    log::error!("{e}");
+                    log::error!("tls acceptor: {e}");
+                    ss.write().await.inc_tls_errors();
                     return;
                 }
             };

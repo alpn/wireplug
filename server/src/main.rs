@@ -17,6 +17,7 @@ use openbsd::{pledge, unveil};
 
 use crate::peering::{SharedStorage, Storage};
 use crate::relay::SharedRelayManager;
+use crate::server::ServerStats;
 
 pub mod config;
 #[cfg(target_os = "openbsd")]
@@ -54,12 +55,14 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
 
     let storage: SharedStorage = Arc::new(RwLock::new(Storage::new()));
     let relay_manager = Arc::new(RwLock::new(relay::RelayManager::new()));
+    let server_stats = Arc::new(RwLock::new(server::ServerStats::new()));
 
     if cli.monitor {
         let s = Arc::clone(&storage);
         let rm = Arc::clone(&relay_manager);
+        let ss = Arc::clone(&server_stats);
         tokio::spawn(async move {
-            if let Err(e) = status::start_writer(s, rm).await {
+            if let Err(e) = status::start_writer(s, rm, ss).await {
                 log::error!("{e}");
             }
         });
@@ -94,7 +97,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     lockdown::step2(cli.monitor)?;
 
     log::info!("serving peer discovery @{wp_listen_addr:?}");
-    server::serve(listener, acceptor, &storage, relay_manager).await;
+    server::serve(listener, acceptor, &storage, relay_manager, server_stats).await;
 
     Ok(())
 }
