@@ -3,12 +3,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::Context;
 use wireguard_control::Key;
 
 use crate::{
     announce, nat,
-    netstat::{self},
+    netstat::{self, NetInfo},
     utils, wg_interface,
 };
 
@@ -16,19 +15,19 @@ pub(crate) fn handle_inactive_peers(
     ifname: &String,
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
+    net_info: &NetInfo,
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {
-    let lan_addrs = match utils::get_lan_addrs(ifname) {
-        Ok(v) => v,
-        Err(e) => {
-            log::warn!("could not get LAN addresses: {e}");
-            vec![]
-        }
-    };
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
-        match announce::announce(ifname, peers, port_to_announce, &lan_addrs, needs_relay) {
+        match announce::announce(
+            ifname,
+            peers,
+            port_to_announce,
+            &net_info.lan_addrs,
+            needs_relay,
+        ) {
             Ok(response) => {
                 let peers_updated =
                     wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;
@@ -51,7 +50,7 @@ pub(crate) fn handle_inactive_peers(
 }
 
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
-    let mut netmon = netstat::NetworkMonitor::new();
+    let mut netmon = netstat::NetworkMonitor::new(ifname);
     let mut peers_manager = wg_interface::PeerTracker::new();
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 
@@ -106,6 +105,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 ifname,
                 &mut peers_manager,
                 &mut inactive_peers,
+                netmon.get_current_info(),
                 port_to_announce,
                 netmon.needs_relay(),
             )?;

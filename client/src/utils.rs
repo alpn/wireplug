@@ -13,7 +13,7 @@ pub(crate) fn get_random_port() -> u16 {
     rng.random_range(1024..=u16::MAX)
 }
 
-pub(crate) fn get_lan_addrs(if_wg: &String) -> std::io::Result<Vec<String>> {
+pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<String>> {
     let mut lan_ips = vec![];
     for ifa in getifaddrs()?.filter(|ifa| {
         ifa.flags.contains(InterfaceFlags::UP)

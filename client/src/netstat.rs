@@ -2,12 +2,12 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use crate::utils;
 
-#[derive(Debug, Copy, Clone)]
-struct NetInfo {
+#[derive(Debug, Clone)]
+pub(crate) struct NetInfo {
     wan_ip4: Option<Ipv4Addr>,
-    wan_ip6: Option<Ipv6Addr>,
+    pub(crate) wan_ip6: Option<Ipv6Addr>,
+    pub(crate) lan_addrs: Vec<String>,
     /*
-    lan_addr: String,
     default_gateway: String,
     dns_server: String,
      */
@@ -24,9 +24,10 @@ impl NetInfo {
         Self {
             wan_ip4: None,
             wan_ip6: None,
+            lan_addrs: vec![],
         }
     }
-    fn detect() -> Self {
+    fn detect(if_name: &str) -> Self {
         let (mut wan_ip4, wan_ip6) = innernet_publicip::get_both();
         if wan_ip4.is_none() {
             wan_ip4 = utils::get_ip_over_https();
@@ -37,7 +38,18 @@ impl NetInfo {
                 );
             }
         }
-        NetInfo { wan_ip4, wan_ip6 }
+        let lan_addrs = match utils::get_lan_addrs(if_name) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("could not get LAN addresses: {e}");
+                vec![]
+            }
+        };
+        NetInfo {
+            wan_ip4,
+            wan_ip6,
+            lan_addrs,
+        }
     }
     fn online(&self) -> bool {
         self.wan_ip4.is_some()
@@ -47,11 +59,12 @@ impl NetInfo {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub(crate) struct NetworkMonitor {
     current: NetInfo,
     last_online: NetInfo,
     hard_nat: bool,
+    wg_if_name: String,
 }
 
 pub(crate) enum NetStatus {
@@ -63,13 +76,14 @@ pub(crate) enum NetStatus {
 }
 
 impl NetworkMonitor {
-    pub fn new() -> Self {
+    pub fn new(wg_if_name: &str) -> Self {
         let current = NetInfo::new();
         log::info!("NetInfo: {current:?}");
         Self {
             current,
             last_online: current,
             hard_nat: false,
+            wg_if_name: wg_if_name.to_owned(),
         }
     }
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
@@ -77,12 +91,12 @@ impl NetworkMonitor {
     }
 
     pub fn check_status(&mut self) -> NetStatus {
-        let new_info = NetInfo::detect();
+        let new_info = NetInfo::detect(&self.wg_if_name);
         log::trace!("Network: {new_info:?}");
 
         if new_info.offline() {
             if self.current.online() {
-                self.last_online = self.current;
+                self.last_online = self.current.clone();
                 self.current = new_info;
                 log::trace!("Network: changed to Offline");
             }
@@ -107,6 +121,10 @@ impl NetworkMonitor {
         self.current = new_info;
         self.hard_nat = false;
         NetStatus::ChangedToNew
+    }
+
+    pub(crate) fn get_current_info(&self) -> &NetInfo {
+        &self.current
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
