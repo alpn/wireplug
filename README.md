@@ -42,7 +42,7 @@ cargo install --git https://github.com/alpn/wireplug wireplugd
 ```
 
 ### Linux
-1. Create a new WireGuard device:
+1. Create a new WireGuard interface:
 
 ```sh
 ip link add dev wg0 type wireguard
@@ -91,7 +91,7 @@ sudo wireplugd wg0
 ```
 
 ### OpenBSD
-1. Follow the example in `man wg` to create a new WireGuard device using `ifconfig(8)` and `hostname.if(5)`.
+1. Follow the example in `man wg` to create a new WireGuard interface using `ifconfig(8)` and `hostname.if(5)`.
 
 2. Run `wireplugd`:
 
