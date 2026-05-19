@@ -1478,15 +1478,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wppriv"
-version = "0.1.0"
-dependencies = [
- "clap",
- "openbsd",
- "tokio",
-]
-
-[[package]]
 name = "x25519-dalek"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
