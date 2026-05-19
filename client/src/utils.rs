@@ -18,8 +18,9 @@ pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<String>> {
     for ifa in getifaddrs()?.filter(|ifa| {
         ifa.flags.contains(InterfaceFlags::UP)
             && !ifa.flags.contains(InterfaceFlags::LOOPBACK)
-            && ifa.address.is_ipv4()
             && !ifa.name.eq(if_wg)
+            && !ifa.name.contains("wg")
+            && !ifa.name.contains("utun")
     }) {
         let ipnet = match ifa.netmask {
             Some(mask) => IpNet::with_netmask(ifa.address, mask)
