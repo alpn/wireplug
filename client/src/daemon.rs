@@ -105,7 +105,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 ifname,
                 &mut peers_manager,
                 &mut inactive_peers,
-                netmon.get_current_info(),
+                &netmon.get_current_info(),
                 port_to_announce,
                 netmon.needs_relay(),
             )?;

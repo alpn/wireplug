@@ -20,16 +20,9 @@ impl PartialEq for NetInfo {
 }
 
 impl NetInfo {
-    fn new() -> Self {
-        Self {
-            wan_ip4: None,
-            wan_ip6: None,
-            lan_addrs: vec![],
-        }
-    }
     fn detect(if_name: &str) -> Self {
         let (mut wan_ip4, wan_ip6) = innernet_publicip::get_both();
-        if wan_ip4.is_none() {
+        if wan_ip4.is_none() && wan_ip6.is_none() {
             wan_ip4 = utils::get_ip_over_https();
             if wan_ip4.is_some() {
                 log::warn!(
@@ -52,7 +45,7 @@ impl NetInfo {
         }
     }
     fn online(&self) -> bool {
-        self.wan_ip4.is_some()
+        self.wan_ip4.is_some() || self.wan_ip6.is_some()
     }
     fn offline(&self) -> bool {
         !self.online()
@@ -61,8 +54,8 @@ impl NetInfo {
 
 #[derive(Clone)]
 pub(crate) struct NetworkMonitor {
-    current: NetInfo,
-    last_online: NetInfo,
+    current: Option<NetInfo>,
+    last_online: Option<NetInfo>,
     hard_nat: bool,
     wg_if_name: String,
 }
@@ -74,14 +67,18 @@ pub(crate) enum NetStatus {
     HardNat,
     Offline,
 }
+pub(crate) enum ExternalIpKind {
+    None,
+    Ipv4,
+    Ipv6,
+    Both,
+}
 
 impl NetworkMonitor {
     pub fn new(wg_if_name: &str) -> Self {
-        let current = NetInfo::new();
-        log::info!("NetInfo: {current:?}");
         Self {
-            current,
-            last_online: current,
+            current: None,
+            last_online: None,
             hard_nat: false,
             wg_if_name: wg_if_name.to_owned(),
         }
@@ -94,21 +91,28 @@ impl NetworkMonitor {
         let new_info = NetInfo::detect(&self.wg_if_name);
         log::trace!("Network: {new_info:?}");
 
+        let Some(current) = self.current.take() else {
+            self.current = Some(new_info.clone());
+            self.last_online = Some(new_info);
+            return NetStatus::ChangedToNew;
+        };
+
         if new_info.offline() {
-            if self.current.online() {
-                self.last_online = self.current.clone();
-                self.current = new_info;
+            if current.online() {
+                self.last_online = Some(current);
+                self.current = Some(new_info);
                 log::trace!("Network: changed to Offline");
             }
             return NetStatus::Offline;
         }
-        if new_info == self.current {
+        if new_info == current {
             return match self.hard_nat {
                 true => NetStatus::HardNat,
                 false => NetStatus::Online,
             };
         }
-        if self.last_online == new_info {
+        let new_info = Some(new_info);
+        if new_info == self.last_online {
             log::trace!("Network: changed to previous");
             self.current = new_info;
             return match self.hard_nat {
@@ -117,7 +121,7 @@ impl NetworkMonitor {
             };
         }
         log::trace!("Network: changed to new");
-        log::debug!("Network: {:?}", new_info.wan_ip4);
+        log::debug!("Network: {:?}", &new_info);
         self.current = new_info;
         self.hard_nat = false;
         NetStatus::ChangedToNew
