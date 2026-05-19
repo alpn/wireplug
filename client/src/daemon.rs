@@ -7,7 +7,7 @@ use wireguard_control::Key;
 
 use crate::{
     announce, nat,
-    netstat::{self, NetInfo},
+    netstat::{self},
     utils, wg_interface,
 };
 
@@ -15,7 +15,7 @@ pub(crate) fn handle_inactive_peers(
     ifname: &String,
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
-    net_info: &NetInfo,
+    lan_addrs: &Vec<String>,
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {
@@ -25,7 +25,7 @@ pub(crate) fn handle_inactive_peers(
             ifname,
             peers,
             port_to_announce,
-            &net_info.lan_addrs,
+            lan_addrs,
             needs_relay,
         ) {
             Ok(response) => {
@@ -105,7 +105,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 ifname,
                 &mut peers_manager,
                 &mut inactive_peers,
-                &netmon.get_current_info(),
+                &netmon.get_current_lan_info(),
                 port_to_announce,
                 netmon.needs_relay(),
             )?;

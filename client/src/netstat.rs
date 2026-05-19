@@ -127,8 +127,11 @@ impl NetworkMonitor {
         NetStatus::ChangedToNew
     }
 
-    pub(crate) fn get_current_info(&self) -> &NetInfo {
-        &self.current
+    pub(crate) fn get_current_lan_info(&self) -> Vec<String> {
+        match &self.current {
+            Some(current) => current.lan_addrs.clone(),
+            None => Vec::new(),
+        }
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
