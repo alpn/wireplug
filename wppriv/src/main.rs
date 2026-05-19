@@ -3,6 +3,8 @@ use clap::Parser;
 #[cfg(target_os = "openbsd")]
 use openbsd::{pledge, unveil};
 
+mod pfctl;
+
 #[derive(Parser)]
 #[command(version, name="wppriv", about="", long_about = None)]
 struct Cli {
