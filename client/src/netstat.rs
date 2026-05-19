@@ -137,4 +137,16 @@ impl NetworkMonitor {
     pub(crate) fn needs_relay(&self) -> bool {
         self.hard_nat
     }
+
+    pub(crate) fn _get_external_ip_kind(&self) -> ExternalIpKind {
+        let Some(current) = &self.current else {
+            return ExternalIpKind::None;
+        };
+        match (current.wan_ip4, current.wan_ip6) {
+            (Some(_), Some(_)) => ExternalIpKind::Both,
+            (Some(_), None) => ExternalIpKind::Ipv4,
+            (None, Some(_)) => ExternalIpKind::Ipv6,
+            (None, None) => ExternalIpKind::None,
+        }
+    }
 }
