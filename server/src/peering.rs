@@ -12,6 +12,7 @@ use tokio::sync::RwLock;
 use crate::relay::{RelayKind, SharedRelayManager};
 
 const RECORD_TIMEOUT_SEC: u64 = 60 * 60;
+const RELAY_ENABLED: bool = false;
 
 #[derive(Clone)]
 struct Record {
@@ -85,7 +86,7 @@ pub(crate) async fn get_peer_endpoints(
                         lan_addrs: record.lan_addrs.clone(),
                         listen_port: record.wan_addr.port(),
                     }
-                } else if announcement.needs_relay || record.needs_relay {
+                } else if RELAY_ENABLED && (announcement.needs_relay || record.needs_relay){
                     let relay_port = match relay_manager.get_relay_port(
                         &announcement.initiator_pubkey,
                         peer,
@@ -113,7 +114,7 @@ pub(crate) async fn get_peer_endpoints(
                 }
             }
             None => {
-                if announcement.needs_relay {
+                if RELAY_ENABLED && announcement.needs_relay {
                     let relay_port = match relay_manager.get_relay_port(
                         &announcement.initiator_pubkey,
                         peer,
