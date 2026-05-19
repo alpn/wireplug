@@ -1,5 +1,8 @@
 use bincode::{Decode, Encode};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::HashMap,
+    net::{Ipv6Addr, SocketAddr},
+};
 
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V0.0.2";
 
@@ -22,6 +25,7 @@ pub struct WireplugAnnouncement {
     pub peer_pubkeys: Vec<String>,
     pub listen_port: u16,
     pub lan_addrs: Vec<String>,
+    pub ip6: Option<Ipv6Addr>,
     pub needs_relay: bool,
 }
 
@@ -31,6 +35,7 @@ impl WireplugAnnouncement {
         peer_pubkeys: Vec<String>,
         listen_port: u16,
         lan_addrs: Vec<String>,
+        ip6: Option<Ipv6Addr>,
         need_relay: bool,
     ) -> Self {
         WireplugAnnouncement {
@@ -39,6 +44,7 @@ impl WireplugAnnouncement {
             peer_pubkeys,
             listen_port,
             lan_addrs,
+            ip6,
             needs_relay: need_relay,
         }
     }

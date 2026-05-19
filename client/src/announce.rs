@@ -71,6 +71,7 @@ pub(crate) fn announce(
         peers.iter().map(|p| p.to_base64()).collect(),
         announcement_port,
         lan_addrs.to_owned(),
+        None,
         needs_relay,
     );
 
