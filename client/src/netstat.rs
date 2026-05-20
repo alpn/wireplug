@@ -91,7 +91,7 @@ impl NetworkMonitor {
         let new_info = NetInfo::detect(&self.wg_if_name);
         log::trace!("Network: {new_info:?}");
 
-        let Some(current) = self.current.take() else {
+        let Some(current) = self.current.clone() else {
             self.current = Some(new_info.clone());
             self.last_online = Some(new_info);
             return NetStatus::ChangedToNew;

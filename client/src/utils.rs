@@ -19,6 +19,7 @@ pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<String>> {
         ifa.flags.contains(InterfaceFlags::UP)
             && !ifa.flags.contains(InterfaceFlags::LOOPBACK)
             && !ifa.name.eq(if_wg)
+            && ifa.address.is_ipv4()
             && !ifa.name.contains("wg")
             && !ifa.name.contains("utun")
     }) {
