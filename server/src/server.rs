@@ -26,7 +26,6 @@ impl ServerStats {
     pub(crate) fn new() -> Self {
         Self { tls_errros: 0 }
     }
-
     fn inc_tls_errors(&mut self) {
         self.tls_errros += 1;
     }

@@ -21,13 +21,7 @@ pub(crate) fn handle_inactive_peers(
 ) -> anyhow::Result<()> {
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
-        match announce::announce(
-            ifname,
-            peers,
-            port_to_announce,
-            lan_addrs,
-            needs_relay,
-        ) {
+        match announce::announce(ifname, peers, port_to_announce, lan_addrs, needs_relay) {
             Ok(response) => {
                 let peers_updated =
                     wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;

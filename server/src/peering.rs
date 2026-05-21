@@ -86,7 +86,7 @@ pub(crate) async fn get_peer_endpoints(
                         lan_addrs: record.lan_addrs.clone(),
                         listen_port: record.wan_addr.port(),
                     }
-                } else if RELAY_ENABLED && (announcement.needs_relay || record.needs_relay){
+                } else if RELAY_ENABLED && (announcement.needs_relay || record.needs_relay) {
                     let relay_port = match relay_manager.get_relay_port(
                         &announcement.initiator_pubkey,
                         peer,
