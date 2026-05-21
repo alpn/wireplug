@@ -1,4 +1,5 @@
 use clap::Parser;
+use tokio::time::sleep;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -93,6 +94,8 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let wp_listen_addr = format!("{}:443", config.wp_listen_on);
     let listener = TcpListener::bind(&wp_listen_addr).await?;
 
+    // let async tasks schedule before lockdown
+    sleep(Duration::from_secs(1)).await;
     #[cfg(target_os = "openbsd")]
     lockdown::step2(cli.monitor)?;
 
