@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{fmt::Write, net::SocketAddr, sync::Arc};
 
 use shared::{
     BINCODE_CONFIG,
@@ -18,19 +18,28 @@ use crate::{
 
 pub(crate) struct ServerStats {
     tls_errros: usize,
+    relays_needed: usize,
 }
 
 pub(crate) type SharedServerStats = Arc<RwLock<ServerStats>>;
 
 impl ServerStats {
     pub(crate) fn new() -> Self {
-        Self { tls_errros: 0 }
+        Self {
+            tls_errros: 0,
+            relays_needed: 0,
+        }
     }
     fn inc_tls_errors(&mut self) {
         self.tls_errros += 1;
     }
-    pub fn get_tls_errors(&self) -> usize {
-        self.tls_errros
+    fn inc_relays_needed(&mut self) {
+        self.relays_needed += 1;
+    }
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> std::fmt::Result {
+        writeln!(writer, "tls errors: {}", self.tls_errros)?;
+        writeln!(writer, "relays needed: {}", self.relays_needed)?;
+        Ok(())
     }
 }
 
@@ -39,6 +48,7 @@ async fn handle_connection<S>(
     announcing_peer_addr: SocketAddr,
     storage: peering::SharedStorage,
     relay_manager: SharedRelayManager,
+    server_stats: SharedServerStats,
 ) -> anyhow::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin,
@@ -77,6 +87,9 @@ where
 
     peering::process_announcement(&announcement, announcing_peer_addr, &storage).await?;
 
+    if announcement.needs_relay {
+        server_stats.write().await.inc_relays_needed();
+    }
     Ok(())
 }
 
@@ -111,7 +124,7 @@ pub(crate) async fn serve(
             };
 
             log::info!("handling request over TLS from {peer_addr:?}");
-            if let Err(e) = handle_connection(stream, peer_addr, s, rm).await {
+            if let Err(e) = handle_connection(stream, peer_addr, s, rm, ss).await {
                 log::error!("{e}");
             }
         });

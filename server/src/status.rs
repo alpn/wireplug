@@ -24,15 +24,11 @@ pub(crate) async fn start_writer(
         }
         writeln!(writer, "\n\nRelays:\n------")?;
         {
-            relay_manager.read().await.debug(&mut writer)?;
+            relay_manager.read().await.write_to(&mut writer)?;
         }
-        writeln!(writer, "\n\nErrors:\n------")?;
+        writeln!(writer, "\n\nStats:\n------")?;
         {
-            writeln!(
-                writer,
-                "tls: {}",
-                server_stats.read().await.get_tls_errors()
-            )?;
+            server_stats.read().await.write_to(&mut writer)?;
         }
         match UnixStream::connect(MON_SOCK).await {
             Ok(mut unix_stream) => {

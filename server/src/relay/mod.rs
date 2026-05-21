@@ -172,7 +172,7 @@ impl RelayManager {
         // destroy (pf) and remove established
     }
 
-    pub fn debug<W: Write>(&self, writer: &mut W) -> std::fmt::Result {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> std::fmt::Result {
         for ((a, b), r) in &self.proto {
             let ip = r.a_ip.to_string();
             let port = r.relay_port;
