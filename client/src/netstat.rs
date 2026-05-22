@@ -7,6 +7,7 @@ pub(crate) struct NetInfo {
     wan_ip4: Option<Ipv4Addr>,
     pub(crate) wan_ip6: Option<Ipv6Addr>,
     pub(crate) lan_addrs: Vec<String>,
+    pub(crate) hard_nat: bool,
     /*
     default_gateway: String,
     dns_server: String,
@@ -44,6 +45,7 @@ impl NetInfo {
             wan_ip4,
             wan_ip6,
             lan_addrs,
+            hard_nat: false,
         }
     }
     fn online(&self) -> bool {
@@ -58,7 +60,6 @@ impl NetInfo {
 pub(crate) struct NetworkMonitor {
     current: Option<NetInfo>,
     last_online: Option<NetInfo>,
-    hard_nat: bool,
     wg_if_name: String,
 }
 
@@ -81,12 +82,14 @@ impl NetworkMonitor {
         Self {
             current: None,
             last_online: None,
-            hard_nat: false,
             wg_if_name: wg_if_name.to_owned(),
         }
     }
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
-        self.hard_nat = hard_nat;
+        match &mut self.current {
+            Some(c) => c.hard_nat = hard_nat,
+            None => (),
+        }
     }
 
     pub fn check_status(&mut self) -> NetStatus {
@@ -98,34 +101,32 @@ impl NetworkMonitor {
             self.last_online = Some(new_info);
             return NetStatus::ChangedToNew;
         };
-
         if new_info.offline() {
             if current.online() {
-                self.last_online = Some(current);
-                self.current = Some(new_info);
-                log::trace!("Network: changed to Offline");
+                log::debug!("Network: changed to Offline");
             }
+            self.current = Some(new_info);
             return NetStatus::Offline;
         }
         if new_info == current {
-            return match self.hard_nat {
+            return match self.current.as_ref().is_some_and(|c| c.hard_nat) {
                 true => NetStatus::HardNat,
                 false => NetStatus::Online,
             };
         }
         let new_info = Some(new_info);
-        if new_info == self.last_online {
+        if current.offline() && new_info == self.last_online {
             log::trace!("Network: changed to previous");
+            let last_online_hard_nat = self.last_online.as_ref().map_or(false, |lo| lo.hard_nat);
             self.current = new_info;
-            return match self.hard_nat {
+            return match last_online_hard_nat {
                 true => NetStatus::HardNat,
                 false => NetStatus::ChangedToPrev,
             };
         }
-        log::trace!("Network: changed to new");
-        log::debug!("Network: {:?}", &new_info);
-        self.current = new_info;
-        self.hard_nat = false;
+        log::debug!("Network: changed to new {:?}", &new_info);
+        self.current = new_info.clone();
+        self.last_online = new_info;
         NetStatus::ChangedToNew
     }
 
@@ -137,7 +138,7 @@ impl NetworkMonitor {
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
-        self.hard_nat
+        self.current.as_ref().map_or(false, |c| c.hard_nat)
     }
 
     pub(crate) fn _get_external_ip_kind(&self) -> ExternalIpKind {
