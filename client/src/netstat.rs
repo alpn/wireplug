@@ -15,7 +15,9 @@ pub(crate) struct NetInfo {
 
 impl PartialEq for NetInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.wan_ip4 == other.wan_ip4
+        self.wan_ip4 == other.wan_ip4 &&
+        self.wan_ip6 == other.wan_ip6 &&
+        self.lan_addrs == other.lan_addrs
     }
 }
 
