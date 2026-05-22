@@ -18,17 +18,11 @@ pub(crate) async fn start_writer(
         let mut writer = String::new();
         write!(writer, "\x1B[2J\x1B[1;1H")?;
         writeln!(writer, "\n\nPeers:\n-----")?;
-        {
-            storage.read().await.write_to(&mut writer)?;
-        }
+        storage.read().await.write_to(&mut writer)?;
         writeln!(writer, "\n\nRelays:\n------")?;
-        {
-            relay_manager.read().await.write_to(&mut writer)?;
-        }
+        relay_manager.read().await.write_to(&mut writer)?;
         writeln!(writer, "\n\nStats:\n------")?;
-        {
-            server_stats.read().await.write_to(&mut writer)?;
-        }
+        server_stats.read().await.write_to(&mut writer)?;
         match UnixStream::connect(MON_SOCK).await {
             Ok(mut unix_stream) => {
                 if let Err(e) = unix_stream.write_all(writer.as_bytes()).await {

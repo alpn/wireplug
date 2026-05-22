@@ -58,7 +58,11 @@ impl Storage {
             let lan = &p.1.lan_addrs;
             let timestamp = &p.1.timestamp;
             let sec = now.duration_since(*timestamp).unwrap().as_secs();
-            writeln!(writer, "\t{peer_a} @{ip} (LAN: {:?} -> {peer_b}) | {sec} sec ago", lan)?;
+            writeln!(
+                writer,
+                "\t{peer_a} @{ip} (LAN: {:?} -> {peer_b}) | {sec} sec ago",
+                lan
+            )?;
         }
         Ok(())
     }
