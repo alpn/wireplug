@@ -19,8 +19,7 @@ pub(crate) async fn start_writer(
         write!(writer, "\x1B[2J\x1B[1;1H")?;
         writeln!(writer, "\n\nPeers:\n-----")?;
         {
-            let s = storage.read().await;
-            s.debug(&mut writer)?;
+            storage.read().await.write_to(&mut writer)?;
         }
         writeln!(writer, "\n\nRelays:\n------")?;
         {

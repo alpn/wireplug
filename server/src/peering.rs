@@ -49,15 +49,16 @@ impl Storage {
             peering_records: HashMap::new(),
         }
     }
-    pub fn debug<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> std::fmt::Result {
         let now = SystemTime::now();
         for p in self.peering_records.iter() {
             let peer_a = &p.0.0;
             let peer_b = &p.0.1;
-            let ip = p.1.wan_addr;
+            let ip = &p.1.wan_addr;
+            let lan = &p.1.lan_addrs;
             let timestamp = &p.1.timestamp;
             let sec = now.duration_since(*timestamp).unwrap().as_secs();
-            writeln!(writer, "\t{peer_a} @{ip} -> {peer_b} | {sec} sec ago").unwrap();
+            writeln!(writer, "\t{peer_a} @{ip} (LAN: {:?} -> {peer_b}) | {sec} sec ago", lan)?;
         }
         Ok(())
     }
