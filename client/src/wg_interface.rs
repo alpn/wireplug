@@ -302,10 +302,12 @@ pub(crate) fn update_peers(
                 lan_addrs,
                 listen_port,
             } => {
-                if let Some(addr) = lan_addrs.first() {
-                    log::debug!("wireplug.org: {peer} is on our local network @{addr}");
-                    let ipnet = IpNet::from_str(addr.as_str())
-                        .map_err(|e| std::io::Error::other(format!("{e}")))?;
+                let candidates = utils::find_lan_candidates(if_name, &lan_addrs);
+                log::debug!(
+                    "wireplug.org: {peer} is on our local network. LAN candidates: {:?}",
+                    candidates
+                );
+                if let Some(ipnet) = candidates.first() {
                     let addr = SocketAddr::new(ipnet.addr(), listen_port);
                     if update_peer(&iface, peer_tracker, &peer_pubkey, addr)? {
                         peers_updated.push(peer_pubkey);

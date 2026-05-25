@@ -58,6 +58,27 @@ pub(crate) fn get_tls_client_connection(name: &str) -> anyhow::Result<rustls::Cl
     )?)
 }
 
+pub(crate) fn addrs_on_link(a: &IpNet, b: &IpNet) -> bool {
+    a.contains(&b.addr()) && b.contains(&a.addr())
+}
+
+pub(crate) fn find_lan_candidates(if_wg: &str, peer_lan_addrs: &Vec<IpNet>) -> Vec<IpNet> {
+    let mut candidates = vec![];
+    match get_lan_addrs(if_wg) {
+        Ok(our_lan_addrs) => {
+            for addr in our_lan_addrs {
+                for peer_addr in peer_lan_addrs {
+                    if addrs_on_link(&addr, peer_addr) {
+                        candidates.push(peer_addr.clone());
+                    }
+                }
+            }
+        }
+        Err(e) => log::warn!("failed to get LAN addresses: {e}"),
+    }
+    candidates
+}
+
 pub(crate) fn get_ip_over_https() -> Option<Ipv4Addr> {
     let ipify_api = "api.ipify.org";
     let mut socket = TcpStream::connect((ipify_api, 443)).ok()?;
