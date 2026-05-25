@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 shared = { path = "../shared" }
-serde = { version = "1.0", features = ["derive"] }
-bincode = { version = "2.0", features = ["serde"] }
+serde = { version = "1.0", default-features = false }
+postcard = "1.1"
 chrono = "0.4.41"
 tokio-rustls = { version = "0.26.2", default-features = false, features = ["ring"] }
 clap = { version = "4.5.41", features = ["derive"] }

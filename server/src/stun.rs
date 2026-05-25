@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use shared::{BINCODE_CONFIG, protocol};
+use shared::protocol::{self, WireplugStunRequest};
 use tokio::net::UdpSocket;
 
 pub async fn start_serving(bind_to: String) {
@@ -25,14 +25,13 @@ pub async fn start_serving(bind_to: String) {
         let observed_port = addr.port();
         let socket = Arc::clone(&socket);
         tokio::spawn(async move {
-            let udp_test_request: protocol::WireplugStunRequest =
-                match bincode::decode_from_slice(&buf[..], BINCODE_CONFIG) {
-                    Ok((req, _)) => req,
-                    Err(e) => {
-                        log::error!("{e}");
-                        return;
-                    }
-                };
+            let udp_test_request: protocol::WireplugStunRequest = match postcard::from_bytes(&buf) {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!("{e}");
+                    return;
+                }
+            };
 
             log::trace!("stated port: {}", udp_test_request.port);
             log::trace!("observed port: {observed_port}");
@@ -41,7 +40,7 @@ pub async fn start_serving(bind_to: String) {
                 false => protocol::WireplugStunResponse::new(Some(observed_port)),
             };
 
-            let data = match bincode::encode_to_vec(udp_test_response, BINCODE_CONFIG) {
+            let data = match postcard::to_allocvec(&udp_test_response) {
                 Ok(data) => data,
                 Err(e) => {
                     log::error!("{e}");

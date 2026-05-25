@@ -1,9 +1,6 @@
 use std::{fmt::Write, net::SocketAddr, sync::Arc};
 
-use shared::{
-    BINCODE_CONFIG,
-    protocol::{self, WireplugResponse},
-};
+use shared::protocol::{self, WireplugResponse};
 use tokio::net::TcpListener;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -64,8 +61,7 @@ where
 
     let mut buffer = [0u8; shared::MAX_MESSAGE_SIZE];
     stream.read_exact(&mut buffer[0..encoded_length]).await?;
-    let (announcement, _): (protocol::WireplugAnnouncement, usize) =
-        bincode::decode_from_slice(&buffer[..], BINCODE_CONFIG)?;
+    let announcement: protocol::WireplugAnnouncement = postcard::from_bytes(&buffer)?;
 
     if !announcement.valid() {
         stream.shutdown().await?;
@@ -77,7 +73,7 @@ where
             .await;
 
     let response = WireplugResponse::from_peer_endpoints(res_peers);
-    let encoded_message = bincode::encode_to_vec(&response, BINCODE_CONFIG)?;
+    let encoded_message = postcard::to_allocvec(&response)?;
     let encoded_size_bytes: [u8; 4] = u32::try_from(encoded_message.len())?.to_le_bytes();
 
     stream.write_all(&encoded_size_bytes).await?;
