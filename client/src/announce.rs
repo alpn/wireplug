@@ -1,5 +1,5 @@
 use shared::{
-    self, BINCODE_CONFIG, WIREPLUG_ORG_WP,
+    self, WIREPLUG_ORG_WP,
     protocol::{self, WireplugResponse},
 };
 use std::{
@@ -15,7 +15,7 @@ fn send_announcement<S: Read + Write>(
     stream: &mut S,
     announcement: protocol::WireplugAnnouncement,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
-    let encoded_message = bincode::encode_to_vec(&announcement, BINCODE_CONFIG)
+    let encoded_message = postcard::to_allocvec(&announcement)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     let encoded_message_size: [u8; 4] = u32::try_from(encoded_message.len())
@@ -37,9 +37,8 @@ fn send_announcement<S: Read + Write>(
     let mut encoded_message = vec![0u8; encoded_length];
     stream.read_exact(&mut encoded_message)?;
 
-    let (response, _): (protocol::WireplugResponse, usize) =
-        bincode::decode_from_slice(&encoded_message[..], BINCODE_CONFIG)
-            .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
+    let response: protocol::WireplugResponse = postcard::from_bytes(&encoded_message)
+        .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     Ok(response)
 }

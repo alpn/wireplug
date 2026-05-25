@@ -1,4 +1,4 @@
-use shared::{BINCODE_CONFIG, protocol};
+use shared::protocol;
 use std::{
     net::{SocketAddr, ToSocketAddrs, UdpSocket},
     time::Duration,
@@ -31,7 +31,7 @@ fn send_stun_request(
     local_port: u16,
 ) -> Result<protocol::WireplugStunResponse, std::io::Error> {
     let request = protocol::WireplugStunRequest::new(local_port);
-    let buf = bincode::encode_to_vec(&request, BINCODE_CONFIG)
+    let buf = postcard::to_allocvec(&request)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{local_port}"))?;
@@ -40,9 +40,8 @@ fn send_stun_request(
 
     let mut res = [0u8; 1024];
     let _ = socket.recv(&mut res)?;
-    let (response, _): (protocol::WireplugStunResponse, usize) =
-        bincode::decode_from_slice(&res[..], BINCODE_CONFIG)
-            .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
+    let response: protocol::WireplugStunResponse = postcard::from_bytes(&res)
+        .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     Ok(response)
 }
