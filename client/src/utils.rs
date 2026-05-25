@@ -5,7 +5,7 @@ use std::{
 };
 
 use getifaddrs::{InterfaceFlags, getifaddrs};
-use ipnet::IpNet;
+use ipnet::{IpAdd, IpNet};
 use rand::Rng;
 
 pub(crate) fn get_random_port() -> u16 {
@@ -13,8 +13,9 @@ pub(crate) fn get_random_port() -> u16 {
     rng.random_range(1024..=u16::MAX)
 }
 
-pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<String>> {
+pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<IpNet>> {
     let mut lan_ips = vec![];
+
     for ifa in getifaddrs()?.filter(|ifa| {
         ifa.flags.contains(InterfaceFlags::UP)
             && !ifa.flags.contains(InterfaceFlags::LOOPBACK)
@@ -23,12 +24,19 @@ pub(crate) fn get_lan_addrs(if_wg: &str) -> std::io::Result<Vec<String>> {
             && !ifa.name.contains("wg")
             && !ifa.name.contains("utun")
     }) {
-        let ipnet = match ifa.netmask {
-            Some(mask) => IpNet::with_netmask(ifa.address, mask)
-                .map_err(|e| std::io::Error::other(format!("{e}")))?,
-            None => IpNet::from(ifa.address),
-        };
-        lan_ips.push(ipnet.to_string());
+        let ipnet = match (ifa.address.ip_addr(), ifa.address.netmask()) {
+            (Some(ip), Some(netmask)) => IpNet::with_netmask(ip, netmask),
+            (Some(ip), None) => IpNet::new(
+                ip,
+                match ip.is_ipv4() {
+                    true => 32,
+                    false => 64,
+                },
+            ),
+            _ => continue,
+        }
+        .map_err(|e| std::io::Error::other(format!("{e}")))?;
+        lan_ips.push(ipnet);
     }
     Ok(lan_ips)
 }

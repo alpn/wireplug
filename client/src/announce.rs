@@ -1,3 +1,4 @@
+use ipnet::IpNet;
 use shared::{
     self, WIREPLUG_ORG_WP,
     protocol::{self, WireplugResponse},
@@ -47,7 +48,7 @@ pub(crate) fn announce(
     if_name: &String,
     peers: &[Key],
     announcement_port: u16,
-    lan_addrs: &Vec<String>,
+    lan_addrs: &Vec<IpNet>,
     needs_relay: bool,
 ) -> Result<WireplugResponse, std::io::Error> {
     let iface = if_name.parse()?;

@@ -1,4 +1,4 @@
-use bincode::{Decode, Encode};
+use ipnet::IpNet;
 use std::{
     collections::HashMap,
     net::{Ipv6Addr, SocketAddr},
@@ -24,7 +24,7 @@ pub struct WireplugAnnouncement {
     pub initiator_pubkey: String,
     pub peer_pubkeys: Vec<String>,
     pub listen_port: u16,
-    pub lan_addrs: Vec<String>,
+    pub lan_addrs: Vec<IpNet>,
     pub ip6: Option<Ipv6Addr>,
     pub needs_relay: bool,
 }
@@ -34,7 +34,7 @@ impl WireplugAnnouncement {
         initiator_pubkey: &String,
         peer_pubkeys: Vec<String>,
         listen_port: u16,
-        lan_addrs: Vec<String>,
+        lan_addrs: Vec<IpNet>,
         ip6: Option<Ipv6Addr>,
         need_relay: bool,
     ) -> Self {
@@ -60,7 +60,7 @@ impl WireplugAnnouncement {
 pub enum WireplugEndpoint {
     Unknown,
     LocalNetwork {
-        lan_addrs: Vec<String>,
+        lan_addrs: Vec<IpNet>,
         listen_port: u16,
     },
     RemoteNetwork(SocketAddr),

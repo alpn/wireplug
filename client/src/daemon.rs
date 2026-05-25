@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use ipnet::IpNet;
 use wireguard_control::Key;
 
 use crate::{
@@ -15,7 +16,7 @@ pub(crate) fn handle_inactive_peers(
     ifname: &String,
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
-    lan_addrs: &Vec<String>,
+    lan_addrs: &Vec<IpNet>,
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {

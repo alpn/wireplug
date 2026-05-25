@@ -17,7 +17,7 @@ const RELAY_ENABLED: bool = false;
 #[derive(Clone)]
 struct Record {
     pub wan_addr: SocketAddr,
-    pub lan_addrs: Vec<String>,
+    pub lan_addrs: Vec<ipnet::IpNet>,
     pub timestamp: SystemTime,
     pub needs_relay: bool,
 }
@@ -25,7 +25,7 @@ struct Record {
 impl Record {
     fn new(
         wan_addr: SocketAddr,
-        lan_addrs: Vec<String>,
+        lan_addrs: Vec<ipnet::IpNet>,
         timestamp: SystemTime,
         needs_relay: bool,
     ) -> Self {

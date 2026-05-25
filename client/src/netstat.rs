@@ -1,12 +1,14 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use ipnet::IpNet;
+
 use crate::utils;
 
 #[derive(Debug, Clone)]
 pub(crate) struct NetInfo {
     wan_ip4: Option<Ipv4Addr>,
     pub(crate) wan_ip6: Option<Ipv6Addr>,
-    pub(crate) lan_addrs: Vec<String>,
+    pub(crate) lan_addrs: Vec<IpNet>,
     pub(crate) hard_nat: bool,
     /*
     default_gateway: String,
@@ -130,7 +132,7 @@ impl NetworkMonitor {
         NetStatus::ChangedToNew
     }
 
-    pub(crate) fn get_current_lan_info(&self) -> Vec<String> {
+    pub(crate) fn get_current_lan_info(&self) -> Vec<IpNet> {
         match &self.current {
             Some(current) => current.lan_addrs.clone(),
             None => Vec::new(),
