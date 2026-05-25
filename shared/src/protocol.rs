@@ -18,7 +18,7 @@ fn is_valid_wgkey(s: &str) -> bool {
     true
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugAnnouncement {
     proto: String,
     pub initiator_pubkey: String,
@@ -56,7 +56,7 @@ impl WireplugAnnouncement {
     }
 }
 
-#[derive(Clone, Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Debug)]
 pub enum WireplugEndpoint {
     Unknown,
     LocalNetwork {
@@ -70,7 +70,7 @@ pub enum WireplugEndpoint {
     },
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugResponse {
     proto: String,
     pub peer_endpoints: HashMap<String, WireplugEndpoint>,
@@ -88,7 +88,7 @@ impl WireplugResponse {
     }
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugStunRequest {
     proto: String,
     pub port: u16,
@@ -103,13 +103,13 @@ impl WireplugStunRequest {
     }
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub enum WireplugStunResult {
     SamePort,
     DifferentPort(u16),
 }
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugStunResponse {
     pub result: WireplugStunResult,
 }
