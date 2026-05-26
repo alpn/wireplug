@@ -50,6 +50,21 @@ async fn handle_connection<S>(
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
+    let mut header = [0u8; 4];
+    stream.read_exact(&mut header).await?;
+    if header[..3] != protocol::WIREPLUG_PROTOCOL_MAGIC {
+        stream.shutdown().await?;
+        return Ok(());
+    }
+    if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION_X {
+        stream.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC).await?;
+        stream
+            .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION_X)
+            .await?;
+
+        stream.shutdown().await?;
+        return Ok(());
+    }
     let encoded_length = usize::try_from(stream.read_u32_le().await?)?;
     if encoded_length > shared::MAX_MESSAGE_SIZE {
         return Err(anyhow::anyhow!(
@@ -76,6 +91,10 @@ where
     let encoded_message = postcard::to_allocvec(&response)?;
     let encoded_size_bytes: [u8; 4] = u32::try_from(encoded_message.len())?.to_le_bytes();
 
+    stream.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC).await?;
+    stream
+        .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION_X)
+        .await?;
     stream.write_all(&encoded_size_bytes).await?;
     stream.write_all(&encoded_message).await?;
 

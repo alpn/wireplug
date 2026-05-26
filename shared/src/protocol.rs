@@ -4,6 +4,8 @@ use std::{
     net::{Ipv6Addr, SocketAddr},
 };
 
+pub const WIREPLUG_PROTOCOL_MAGIC: [u8; 3] = [0xFD, 0xAC, 0xAF];
+pub const WIREPLUG_PROTOCOL_VERSION_X: [u8; 1] = [0x1];
 const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V0.0.2";
 
 fn is_valid_wgkey(s: &str) -> bool {
