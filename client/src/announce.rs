@@ -17,7 +17,7 @@ fn send_announcement<S: Read + Write>(
     announcement: protocol::WireplugAnnouncement,
 ) -> Result<protocol::WireplugResponse, std::io::Error> {
     stream.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC)?;
-    stream.write_all(&protocol::WIREPLUG_PROTOCOL_VERSION_X)?;
+    stream.write_all(&protocol::WIREPLUG_PROTOCOL_VERSION)?;
 
     let encoded_message = postcard::to_allocvec(&announcement)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
@@ -33,7 +33,7 @@ fn send_announcement<S: Read + Write>(
     if header[..3] != protocol::WIREPLUG_PROTOCOL_MAGIC {
         return Err(std::io::Error::other("bad message"));
     }
-    if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION_X {
+    if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION {
         log::warn!("You're running an outdated version of wireplugd.");
         log::warn!("Please update to the latest version to continue using the service.");
         // XXX

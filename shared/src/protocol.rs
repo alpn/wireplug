@@ -5,8 +5,7 @@ use std::{
 };
 
 pub const WIREPLUG_PROTOCOL_MAGIC: [u8; 3] = [0xFD, 0xAC, 0xAF];
-pub const WIREPLUG_PROTOCOL_VERSION_X: [u8; 1] = [0x1];
-const WIREPLUG_PROTOCOL_VERSION: &str = "Wireplug_V0.0.2";
+pub const WIREPLUG_PROTOCOL_VERSION: [u8; 1] = [0x1];
 
 fn is_valid_wgkey(s: &str) -> bool {
     if s.len() != 44 {
@@ -22,7 +21,6 @@ fn is_valid_wgkey(s: &str) -> bool {
 
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugAnnouncement {
-    proto: String,
     pub initiator_pubkey: String,
     pub peer_pubkeys: Vec<String>,
     pub listen_port: u16,
@@ -41,7 +39,6 @@ impl WireplugAnnouncement {
         need_relay: bool,
     ) -> Self {
         WireplugAnnouncement {
-            proto: String::from(WIREPLUG_PROTOCOL_VERSION),
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkeys,
             listen_port,
@@ -51,8 +48,7 @@ impl WireplugAnnouncement {
         }
     }
     pub fn valid(&self) -> bool {
-        self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
-            && is_valid_wgkey(&self.initiator_pubkey)
+        is_valid_wgkey(&self.initiator_pubkey)
             && self.peer_pubkeys.iter().all(|p| is_valid_wgkey(p))
             && self.listen_port >= 1024
     }
@@ -74,34 +70,27 @@ pub enum WireplugEndpoint {
 
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugResponse {
-    proto: String,
     pub peer_endpoints: HashMap<String, WireplugEndpoint>,
 }
 
 impl WireplugResponse {
     pub fn from_peer_endpoints(peer_endpoints: HashMap<String, WireplugEndpoint>) -> Self {
-        WireplugResponse {
-            proto: WIREPLUG_PROTOCOL_VERSION.to_string(),
-            peer_endpoints,
-        }
+        WireplugResponse { peer_endpoints }
     }
     pub fn valid(&self) -> bool {
-        self.proto.eq(WIREPLUG_PROTOCOL_VERSION)
+        // XXX
+        true
     }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 pub struct WireplugStunRequest {
-    proto: String,
     pub port: u16,
 }
 
 impl WireplugStunRequest {
     pub fn new(port: u16) -> Self {
-        WireplugStunRequest {
-            proto: String::from(WIREPLUG_PROTOCOL_VERSION),
-            port,
-        }
+        WireplugStunRequest { port }
     }
 }
 

@@ -56,10 +56,10 @@ where
         stream.shutdown().await?;
         return Ok(());
     }
-    if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION_X {
+    if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION {
         stream.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC).await?;
         stream
-            .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION_X)
+            .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION)
             .await?;
 
         stream.shutdown().await?;
@@ -93,7 +93,7 @@ where
 
     stream.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC).await?;
     stream
-        .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION_X)
+        .write_all(&protocol::WIREPLUG_PROTOCOL_VERSION)
         .await?;
     stream.write_all(&encoded_size_bytes).await?;
     stream.write_all(&encoded_message).await?;
