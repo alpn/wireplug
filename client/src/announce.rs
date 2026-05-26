@@ -6,6 +6,7 @@ use shared::{
 use std::{
     io::{Read, Write},
     net::TcpStream,
+    process,
     time::Duration,
 };
 use wireguard_control::{Backend, Device, Key};
