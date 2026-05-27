@@ -10,32 +10,52 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-macos:
+    runs-on: macos-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        rust: [stable]
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
-
+        with: { toolchain: stable, override: true }
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
       - name: Build (release)
-        run: cargo build --release --verbose
-
-      - name: Package binary
-        run: |
-          mkdir -p dist
-          cp target/release/wireplugd dist/
-
-      - name: Upload artifact
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Upload mac artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wireplugd-${{ matrix.os }}
-          path: dist/
+          name: my-binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/my-binary
+
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with: { toolchain: stable, override: true }
+      - name: Add target & install musl deps
+        run: |
+          rustup target add ${{ matrix.target }}
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+          fi
+      - name: Build (release)
+        run: |
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+      - name: Upload linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-binary-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/my-binary
