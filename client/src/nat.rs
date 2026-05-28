@@ -1,5 +1,6 @@
 use shared::protocol;
 use std::{
+    io::Write,
     net::{SocketAddr, ToSocketAddrs, UdpSocket},
     time::Duration,
 };
@@ -30,13 +31,20 @@ fn send_stun_request(
     dst: SocketAddr,
     local_port: u16,
 ) -> Result<protocol::WireplugStunResponse, std::io::Error> {
+    let mut buf = Vec::with_capacity(std::mem::size_of::<protocol::WireplugStunRequest>()  + 4 );
+
+    buf.write(&protocol::WIREPLUG_PROTOCOL_MAGIC)?;
+    buf.write(&protocol::WIREPLUG_PROTOCOL_VERSION)?;
+
     let request = protocol::WireplugStunRequest::new(local_port);
-    let buf = postcard::to_allocvec(&request)
+    buf = postcard::to_extend(&request, buf)
         .map_err(|e| std::io::Error::other(format!("encoding error: {e}")))?;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{local_port}"))?;
     socket.set_read_timeout(Some(Duration::from_millis(500)))?;
-    let _ = socket.send_to(&buf, dst)?;
+    if buf.len() != socket.send_to(&buf, dst)? {
+        return Err(std::io::Error::other("send_stun_request() failed"));
+    }
 
     let mut res = [0u8; 1024];
     let _ = socket.recv(&mut res)?;

@@ -25,7 +25,13 @@ pub async fn start_serving(bind_to: String) {
         let observed_port = addr.port();
         let socket = Arc::clone(&socket);
         tokio::spawn(async move {
-            let udp_test_request: protocol::WireplugStunRequest = match postcard::from_bytes(&buf) {
+            if &buf[..3] != protocol::WIREPLUG_PROTOCOL_MAGIC
+                || &buf[3..=3] != protocol::WIREPLUG_PROTOCOL_VERSION
+            {
+                log::warn!("bad STUN client");
+                return;
+            }
+            let udp_test_request: protocol::WireplugStunRequest = match postcard::from_bytes(&buf[4..]) {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!("{e}");
