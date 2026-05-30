@@ -16,13 +16,13 @@ pub(crate) fn handle_inactive_peers(
     ifname: &String,
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
-    net_info: NetInfo,
+    netinfo: NetInfo,
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
-        match announce::announce(ifname, peers, port_to_announce, &net_info, needs_relay) {
+        match announce::announce(ifname, peers, port_to_announce, &netinfo, needs_relay) {
             Ok(response) => {
                 let peers_updated =
                     wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;

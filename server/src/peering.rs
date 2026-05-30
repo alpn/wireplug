@@ -178,7 +178,7 @@ pub(crate) async fn process_announcement(
                 announing_peer_ipv4,
                 announcement.ipv6,
                 announcement.lan_addrs.to_owned(),
-                announcement.listen_port,
+                announcement.wg_port,
                 SystemTime::now(),
                 announcement.needs_relay,
             ),

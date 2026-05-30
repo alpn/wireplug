@@ -24,7 +24,7 @@ pub struct WireplugAnnouncement {
     pub initiator_pubkey: String,
     pub peer_pubkeys: Vec<String>,
     pub ipv6: Option<Ipv6Addr>,
-    pub listen_port: u16,
+    pub wg_port: u16,
     pub lan_addrs: Vec<IpNet>,
     pub needs_relay: bool,
 }
@@ -34,7 +34,7 @@ impl WireplugAnnouncement {
         initiator_pubkey: &String,
         peer_pubkeys: Vec<String>,
         ipv6: Option<Ipv6Addr>,
-        listen_port: u16,
+        wg_port: u16,
         lan_addrs: Vec<IpNet>,
         need_relay: bool,
     ) -> Self {
@@ -42,7 +42,7 @@ impl WireplugAnnouncement {
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkeys,
             ipv6,
-            listen_port,
+            wg_port,
             lan_addrs,
             needs_relay: need_relay,
         }
@@ -50,7 +50,7 @@ impl WireplugAnnouncement {
     pub fn valid(&self) -> bool {
         is_valid_wgkey(&self.initiator_pubkey)
             && self.peer_pubkeys.iter().all(|p| is_valid_wgkey(p))
-            && self.listen_port >= 1024
+            && self.wg_port >= 1024
     }
 }
 
