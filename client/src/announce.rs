@@ -11,7 +11,7 @@ use std::{
 };
 use wireguard_control::{Backend, Device, Key};
 
-use crate::utils;
+use crate::{netstat::NetInfo, utils};
 
 fn send_announcement<S: Read + Write>(
     stream: &mut S,
@@ -64,7 +64,7 @@ pub(crate) fn announce(
     if_name: &String,
     peers: &[Key],
     announcement_port: u16,
-    lan_addrs: &Vec<IpNet>,
+    netinfo: &NetInfo,
     needs_relay: bool,
 ) -> Result<WireplugResponse, std::io::Error> {
     let iface = if_name.parse()?;
@@ -85,9 +85,9 @@ pub(crate) fn announce(
     let announcement = protocol::WireplugAnnouncement::new(
         &initiator_pubkey.to_base64(),
         peers.iter().map(|p| p.to_base64()).collect(),
+        netinfo.wan_ipv6,
         announcement_port,
-        lan_addrs.to_owned(),
-        None,
+        netinfo.lan_addrs.clone(),
         needs_relay,
     );
 

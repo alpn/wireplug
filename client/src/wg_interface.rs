@@ -13,7 +13,7 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::{config::Config, utils};
+use crate::{config::Config, netstat::NetInfo, utils};
 
 pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
@@ -299,8 +299,9 @@ pub(crate) fn update_peers(
         match peer_endpoint {
             protocol::WireplugEndpoint::Unknown => log::debug!("wireplug.org: {peer} is unknown"),
             protocol::WireplugEndpoint::LocalNetwork {
+                ipv6,
                 lan_addrs,
-                listen_port,
+                wg_port,
             } => {
                 let candidates = utils::find_lan_candidates(if_name, &lan_addrs);
                 log::debug!(
@@ -308,7 +309,7 @@ pub(crate) fn update_peers(
                     candidates
                 );
                 if let Some(ipnet) = candidates.first() {
-                    let addr = SocketAddr::new(ipnet.addr(), listen_port);
+                    let addr = SocketAddr::new(ipnet.addr(), wg_port);
                     if update_peer(&iface, peer_tracker, &peer_pubkey, addr)? {
                         peers_updated.push(peer_pubkey);
                     }

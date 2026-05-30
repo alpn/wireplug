@@ -8,7 +8,7 @@ use wireguard_control::Key;
 
 use crate::{
     announce, nat,
-    netstat::{self},
+    netstat::{self, NetInfo},
     utils, wg_interface,
 };
 
@@ -16,13 +16,13 @@ pub(crate) fn handle_inactive_peers(
     ifname: &String,
     peer_tracker: &mut wg_interface::PeerTracker,
     peers: &mut Vec<Key>,
-    lan_addrs: &Vec<IpNet>,
+    net_info: NetInfo,
     port_to_announce: u16,
     needs_relay: bool,
 ) -> anyhow::Result<()> {
     const MAX_ANNOUNCE_RETRIES: usize = 3;
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
-        match announce::announce(ifname, peers, port_to_announce, lan_addrs, needs_relay) {
+        match announce::announce(ifname, peers, port_to_announce, &net_info, needs_relay) {
             Ok(response) => {
                 let peers_updated =
                     wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;
@@ -96,11 +96,15 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
         }
         if !inactive_peers.is_empty() {
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
+            let Some(netinfo) = netmon.get_current() else {
+                log::warn!("no NetInfo - skipping");
+                continue;
+            };
             handle_inactive_peers(
                 ifname,
                 &mut peers_manager,
                 &mut inactive_peers,
-                &netmon.get_current_lan_info(),
+                netinfo,
                 port_to_announce,
                 netmon.needs_relay(),
             )?;

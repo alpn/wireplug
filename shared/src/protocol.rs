@@ -1,7 +1,7 @@
 use ipnet::IpNet;
 use std::{
     collections::HashMap,
-    net::{Ipv6Addr, SocketAddr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
 };
 
 pub const WIREPLUG_PROTOCOL_MAGIC: [u8; 3] = [0xFD, 0xAC, 0xAF];
@@ -23,9 +23,9 @@ fn is_valid_wgkey(s: &str) -> bool {
 pub struct WireplugAnnouncement {
     pub initiator_pubkey: String,
     pub peer_pubkeys: Vec<String>,
+    pub ipv6: Option<Ipv6Addr>,
     pub listen_port: u16,
     pub lan_addrs: Vec<IpNet>,
-    pub ip6: Option<Ipv6Addr>,
     pub needs_relay: bool,
 }
 
@@ -33,17 +33,17 @@ impl WireplugAnnouncement {
     pub fn new(
         initiator_pubkey: &String,
         peer_pubkeys: Vec<String>,
+        ipv6: Option<Ipv6Addr>,
         listen_port: u16,
         lan_addrs: Vec<IpNet>,
-        ip6: Option<Ipv6Addr>,
         need_relay: bool,
     ) -> Self {
         WireplugAnnouncement {
             initiator_pubkey: initiator_pubkey.to_owned(),
             peer_pubkeys,
+            ipv6,
             listen_port,
             lan_addrs,
-            ip6,
             needs_relay: need_relay,
         }
     }
@@ -58,10 +58,15 @@ impl WireplugAnnouncement {
 pub enum WireplugEndpoint {
     Unknown,
     LocalNetwork {
+        ipv6: Option<Ipv6Addr>,
         lan_addrs: Vec<IpNet>,
-        listen_port: u16,
+        wg_port: u16,
     },
-    RemoteNetwork(SocketAddr),
+    RemoteNetwork {
+        ipv4: Option<Ipv4Addr>,
+        ipv6: Option<Ipv6Addr>,
+        wg_port: u16,
+    },
     Relay {
         id: usize,
         port: u16,

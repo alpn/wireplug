@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Write,
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -16,22 +16,30 @@ const RELAY_ENABLED: bool = false;
 
 #[derive(Clone)]
 struct Record {
-    pub wan_addr: SocketAddr,
+    // XXX ipv4 is currently not optional
+    // pub wan_ipv4: Option<Ipv4Addr>,
+    pub wan_ipv4: Ipv4Addr,
+    pub wan_ipv6: Option<Ipv6Addr>,
     pub lan_addrs: Vec<ipnet::IpNet>,
+    pub wg_port: u16,
     pub timestamp: SystemTime,
     pub needs_relay: bool,
 }
 
 impl Record {
     fn new(
-        wan_addr: SocketAddr,
+        wan_ipv4: Ipv4Addr,
+        wan_ipv6: Option<Ipv6Addr>,
         lan_addrs: Vec<ipnet::IpNet>,
+        wg_port: u16,
         timestamp: SystemTime,
         needs_relay: bool,
     ) -> Self {
         Self {
-            wan_addr,
+            wan_ipv4,
+            wan_ipv6,
             lan_addrs,
+            wg_port,
             timestamp,
             needs_relay,
         }
@@ -54,13 +62,16 @@ impl Storage {
         for p in self.peering_records.iter() {
             let peer_a = &p.0.0;
             let peer_b = &p.0.1;
-            let ip = &p.1.wan_addr;
+            let ipv4= &p.1.wan_ipv4;
+            let ipv6 = &p.1.wan_ipv6;
             let lan = &p.1.lan_addrs;
             let timestamp = &p.1.timestamp;
             let sec = now.duration_since(*timestamp).unwrap().as_secs();
             writeln!(
                 writer,
-                "\t{peer_a} @{ip} (LAN: {:?} -> {peer_b}) | {sec} sec ago",
+                "\t{peer_a} @{:?}/{:?} (LAN: {:?} -> {peer_b}) | {sec} sec ago",
+                ipv4,
+                ipv6,
                 lan
             )?;
         }
@@ -86,10 +97,11 @@ pub(crate) async fn get_peer_endpoints(
             .get(&(peer.to_owned(), announcement.initiator_pubkey.to_owned()))
         {
             Some(record) => {
-                if announcing_peer_addr.ip() == record.wan_addr.ip() {
+                if announcing_peer_addr.ip() == record.wan_ipv4 {
                     WireplugEndpoint::LocalNetwork {
+                        ipv6: record.wan_ipv6,
                         lan_addrs: record.lan_addrs.clone(),
-                        listen_port: record.wan_addr.port(),
+                        wg_port: record.wg_port,
                     }
                 } else if RELAY_ENABLED && (announcement.needs_relay || record.needs_relay) {
                     let relay_port = match relay_manager.get_relay_port(
@@ -115,7 +127,11 @@ pub(crate) async fn get_peer_endpoints(
                         port: relay_port,
                     }
                 } else {
-                    WireplugEndpoint::RemoteNetwork(record.wan_addr)
+                    WireplugEndpoint::RemoteNetwork {
+                        ipv4: Some(record.wan_ipv4),
+                        ipv6: record.wan_ipv6,
+                        wg_port: record.wg_port,
+                    }
                 }
             }
             None => {
@@ -148,14 +164,21 @@ pub(crate) async fn process_announcement(
     announcing_peer_addr: SocketAddr,
     storage: &SharedStorage,
 ) -> std::io::Result<()> {
-    let peer_wg_wan_addr = SocketAddr::new(announcing_peer_addr.ip(), announcement.listen_port);
+    let announing_peer_ipv4 = match announcing_peer_addr.ip(){
+        IpAddr::V4(ipv4_addr) => ipv4_addr,
+        IpAddr::V6(ipv6_addr) => {
+            return Err(std::io::Error::other("bad ip"));
+        }
+    };
     let mut storage_writer = storage.write().await;
     for peer in &announcement.peer_pubkeys {
         storage_writer.peering_records.insert(
             (announcement.initiator_pubkey.to_owned(), peer.to_owned()),
             Record::new(
-                peer_wg_wan_addr,
+                announing_peer_ipv4,
+                announcement.ipv6,
                 announcement.lan_addrs.to_owned(),
+                announcement.listen_port,
                 SystemTime::now(),
                 announcement.needs_relay,
             ),

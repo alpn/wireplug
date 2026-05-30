@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use ipnet::IpNet;
 
@@ -6,8 +6,8 @@ use crate::utils;
 
 #[derive(Debug, Clone)]
 pub(crate) struct NetInfo {
-    wan_ip4: Option<Ipv4Addr>,
-    pub(crate) wan_ip6: Option<Ipv6Addr>,
+    wan_ipv4: Option<Ipv4Addr>,
+    pub(crate) wan_ipv6: Option<Ipv6Addr>,
     pub(crate) lan_addrs: Vec<IpNet>,
     pub(crate) hard_nat: bool,
     /*
@@ -18,21 +18,21 @@ pub(crate) struct NetInfo {
 
 impl PartialEq for NetInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.wan_ip4 == other.wan_ip4
-            && self.wan_ip6 == other.wan_ip6
+        self.wan_ipv4 == other.wan_ipv4
+            && self.wan_ipv6 == other.wan_ipv6
             && self.lan_addrs == other.lan_addrs
     }
 }
 
 impl NetInfo {
     fn detect(if_name: &str) -> Self {
-        let (mut wan_ip4, wan_ip6) = innernet_publicip::get_both();
-        if wan_ip4.is_none() && wan_ip6.is_none() {
-            wan_ip4 = utils::get_ip_over_https();
-            if wan_ip4.is_some() {
+        let (mut wan_ipv4, wan_ipv6) = innernet_publicip::get_both();
+        if wan_ipv4.is_none() && wan_ipv6.is_none() {
+            wan_ipv4 = utils::get_ip_over_https();
+            if wan_ipv4.is_some() {
                 log::warn!(
                     "Network: quad9 is unreachable, ip found via HTTPS {:?}",
-                    wan_ip4
+                    wan_ipv4
                 );
             }
         }
@@ -44,14 +44,14 @@ impl NetInfo {
             }
         };
         NetInfo {
-            wan_ip4,
-            wan_ip6,
+            wan_ipv4,
+            wan_ipv6,
             lan_addrs,
             hard_nat: false,
         }
     }
     fn online(&self) -> bool {
-        self.wan_ip4.is_some() || self.wan_ip6.is_some()
+        self.wan_ipv4.is_some() || self.wan_ipv6.is_some()
     }
     fn offline(&self) -> bool {
         !self.online()
@@ -132,11 +132,8 @@ impl NetworkMonitor {
         NetStatus::ChangedToNew
     }
 
-    pub(crate) fn get_current_lan_info(&self) -> Vec<IpNet> {
-        match &self.current {
-            Some(current) => current.lan_addrs.clone(),
-            None => Vec::new(),
-        }
+    pub(crate) fn get_current(&self) -> Option<NetInfo> {
+        self.current.clone()
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
@@ -147,7 +144,7 @@ impl NetworkMonitor {
         let Some(current) = &self.current else {
             return ExternalIpKind::None;
         };
-        match (current.wan_ip4, current.wan_ip6) {
+        match (current.wan_ipv4, current.wan_ipv6) {
             (Some(_), Some(_)) => ExternalIpKind::Both,
             (Some(_), None) => ExternalIpKind::Ipv4,
             (None, Some(_)) => ExternalIpKind::Ipv6,
