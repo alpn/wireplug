@@ -31,7 +31,7 @@ fn send_stun_request(
     dst: SocketAddr,
     local_port: u16,
 ) -> Result<protocol::WireplugStunResponse, std::io::Error> {
-    let mut buf = Vec::with_capacity(std::mem::size_of::<protocol::WireplugStunRequest>()  + 4 );
+    let mut buf = Vec::with_capacity(std::mem::size_of::<protocol::WireplugStunRequest>() + 4);
 
     buf.write(&protocol::WIREPLUG_PROTOCOL_MAGIC)?;
     buf.write(&protocol::WIREPLUG_PROTOCOL_VERSION)?;

@@ -288,6 +288,7 @@ pub(crate) fn update_peers(
     if_name: &str,
     peer_tracker: &mut PeerTracker,
     new_endpoints: HashMap<String, protocol::WireplugEndpoint>,
+    local_has_ipv6: bool,
 ) -> Result<Vec<Key>, std::io::Error> {
     let iface = if_name.parse()?;
     let mut peers_updated = vec![];
@@ -303,21 +304,39 @@ pub(crate) fn update_peers(
                 lan_addrs,
                 wg_port,
             } => {
-                let candidates = utils::find_lan_candidates(if_name, &lan_addrs);
-                log::debug!(
-                    "wireplug.org: {peer} is on our local network. LAN candidates: {:?}",
-                    candidates
-                );
-                if let Some(ipnet) = candidates.first() {
-                    let addr = SocketAddr::new(ipnet.addr(), wg_port);
-                    if update_peer(&iface, peer_tracker, &peer_pubkey, addr)? {
-                        peers_updated.push(peer_pubkey);
+                let ip_to_use = if local_has_ipv6 && let Some(ipv6) = ipv6 {
+                    IpAddr::V6(ipv6)
+                } else {
+                    let candidates = utils::find_lan_candidates(if_name, &lan_addrs);
+                    log::trace!(
+                        "wireplug.org: {peer} is on our local network. LAN candidates: {:?}",
+                        candidates
+                    );
+                    match candidates.first() {
+                        Some(addr) => addr.addr(),
+                        None => continue,
                     }
+                };
+                let sa = SocketAddr::new(ip_to_use, wg_port);
+                log::debug!("wireplug.org: {peer} is @{:?}", &sa);
+                if update_peer(&iface, peer_tracker, &peer_pubkey, sa)? {
+                    peers_updated.push(peer_pubkey);
                 }
             }
-            protocol::WireplugEndpoint::RemoteNetwork(wan_addr) => {
-                log::debug!("wireplug.org: {peer} is @{wan_addr}");
-                if update_peer(&iface, peer_tracker, &peer_pubkey, wan_addr)? {
+            protocol::WireplugEndpoint::RemoteNetwork {
+                ipv4,
+                ipv6,
+                wg_port,
+            } => {
+                let ip_to_use = if local_has_ipv6 && let Some(ipv6) = ipv6 {
+                    IpAddr::V6(ipv6)
+                } else {
+                    ipv4.map(IpAddr::V4)
+                        .ok_or(std::io::Error::other("peer has no ip"))?
+                };
+                let sa = SocketAddr::new(ip_to_use, wg_port);
+                log::debug!("wireplug.org: {peer} is @{:?}", &sa);
+                if update_peer(&iface, peer_tracker, &peer_pubkey, sa)? {
                     peers_updated.push(peer_pubkey);
                 }
             }

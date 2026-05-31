@@ -62,7 +62,7 @@ impl Storage {
         for p in self.peering_records.iter() {
             let peer_a = &p.0.0;
             let peer_b = &p.0.1;
-            let ipv4= &p.1.wan_ipv4;
+            let ipv4 = &p.1.wan_ipv4;
             let ipv6 = &p.1.wan_ipv6;
             let lan = &p.1.lan_addrs;
             let timestamp = &p.1.timestamp;
@@ -70,9 +70,7 @@ impl Storage {
             writeln!(
                 writer,
                 "\t{peer_a} @{:?}/{:?} (LAN: {:?} -> {peer_b}) | {sec} sec ago",
-                ipv4,
-                ipv6,
-                lan
+                ipv4, ipv6, lan
             )?;
         }
         Ok(())
@@ -164,7 +162,7 @@ pub(crate) async fn process_announcement(
     announcing_peer_addr: SocketAddr,
     storage: &SharedStorage,
 ) -> std::io::Result<()> {
-    let announing_peer_ipv4 = match announcing_peer_addr.ip(){
+    let announing_peer_ipv4 = match announcing_peer_addr.ip() {
         IpAddr::V4(ipv4_addr) => ipv4_addr,
         IpAddr::V6(ipv6_addr) => {
             return Err(std::io::Error::other("bad ip"));

@@ -24,8 +24,12 @@ pub(crate) fn handle_inactive_peers(
     for _ in 1..=MAX_ANNOUNCE_RETRIES {
         match announce::announce(ifname, peers, port_to_announce, &netinfo, needs_relay) {
             Ok(response) => {
-                let peers_updated =
-                    wg_interface::update_peers(ifname, peer_tracker, response.peer_endpoints)?;
+                let peers_updated = wg_interface::update_peers(
+                    ifname,
+                    peer_tracker,
+                    response.peer_endpoints,
+                    netinfo.wan_ipv6.is_some(),
+                )?;
                 if !peers_updated.is_empty() {
                     log::info!(
                         "some endpoints were updated, waiting for peers to attempt handshakes.."

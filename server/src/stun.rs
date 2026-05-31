@@ -31,13 +31,14 @@ pub async fn start_serving(bind_to: String) {
                 log::warn!("bad STUN client");
                 return;
             }
-            let udp_test_request: protocol::WireplugStunRequest = match postcard::from_bytes(&buf[4..]) {
-                Ok(r) => r,
-                Err(e) => {
-                    log::error!("{e}");
-                    return;
-                }
-            };
+            let udp_test_request: protocol::WireplugStunRequest =
+                match postcard::from_bytes(&buf[4..]) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log::error!("{e}");
+                        return;
+                    }
+                };
 
             log::trace!("stated port: {}", udp_test_request.port);
             log::trace!("observed port: {observed_port}");
