@@ -128,7 +128,7 @@ impl RelayManager {
         {
             relay.relay_port
         } else {
-            0u16 // XXX get_free_random_port()
+            get_free_random_port() // XXX
         };
         self.proto.insert(
             (peer_a.to_string(), peer_b.to_string()),
@@ -227,6 +227,6 @@ impl WriteTo for EstablishedRelay {
     }
 }
 
-fn _get_free_random_port() -> u16 {
+fn get_free_random_port() -> u16 {
     todo!()
 }

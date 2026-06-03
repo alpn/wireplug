@@ -36,7 +36,7 @@ fn send_announcement<S: Read + Write>(
     if header[3..] != protocol::WIREPLUG_PROTOCOL_VERSION {
         log::warn!("You're running an outdated version of wireplugd.");
         log::warn!("Please update to the latest version to continue using the service.");
-        // XXX
+        // XXX needs to return custom error so we can kill wireguard-go before we go down
         process::exit(1);
     }
 
