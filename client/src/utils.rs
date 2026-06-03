@@ -5,7 +5,7 @@ use std::{
 };
 
 use getifaddrs::{InterfaceFlags, getifaddrs};
-use ipnet::{IpAdd, IpNet};
+use ipnet::IpNet;
 use rand::Rng;
 
 pub(crate) fn get_random_port() -> u16 {
@@ -79,13 +79,12 @@ pub(crate) fn find_lan_candidates(if_wg: &str, peer_lan_addrs: &Vec<IpNet>) -> V
     candidates
 }
 
-pub(crate) fn get_ip_over_https() -> Option<Ipv4Addr> {
-    let ipify_api = "api.ipify.org";
-    let mut socket = TcpStream::connect((ipify_api, 443)).ok()?;
+fn get_ip_over_https(api_url: &str) -> Option<String> {
+    let mut socket = TcpStream::connect((api_url, 443)).ok()?;
     socket
         .set_read_timeout(Some(Duration::from_millis(500)))
         .ok();
-    let mut client_connection = get_tls_client_connection(ipify_api).ok()?;
+    let mut client_connection = get_tls_client_connection(api_url).ok()?;
     let mut stream = rustls::Stream::new(&mut client_connection, &mut socket);
 
     let buf = "GET / HTTP/1.1\r\n\
@@ -102,16 +101,22 @@ pub(crate) fn get_ip_over_https() -> Option<Ipv4Addr> {
     let s = String::from_utf8_lossy(res);
     let (_, body) = s.split_once("\r\n\r\n")?;
     let s = body.trim_ascii();
-    s.parse().ok()
+    Some(s.to_owned())
+}
+
+pub(crate) fn get_ip64_over_https() -> (Option<Ipv4Addr>, Option<std::net::Ipv6Addr>) {
+    let ipv4 = get_ip_over_https("api.ipify.org").and_then(|s| s.parse().ok());
+    let ipv6 = get_ip_over_https("api6.ipify.org").and_then(|s| s.parse().ok());
+    (ipv4, ipv6)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::get_ip_over_https;
+    use crate::utils::get_ip64_over_https;
 
     #[test]
     fn it_works() {
-        let ip = get_ip_over_https();
-        println!("ip: {:?}", ip);
+        let (ipv4, ipv6) = get_ip64_over_https();
+        assert!(ipv4.is_some() || ipv6.is_some(),"get_ip64_over_https() failed");
     }
 }
