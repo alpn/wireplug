@@ -74,7 +74,7 @@ pub(crate) fn announce(
         )));
     };
 
-    let mut socket = TcpStream::connect((WIREPLUG_ORG_WP, 443))?;
+    let mut socket = TcpStream::connect((WIREPLUG_ORG_WP, shared::WIREPLUG_WPCOD_PORT))?;
     socket.set_write_timeout(Some(Duration::from_secs(1)))?;
     socket.set_read_timeout(Some(Duration::from_secs(1)))?;
     let mut client_connection = utils::get_tls_client_connection(WIREPLUG_ORG_WP)

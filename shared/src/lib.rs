@@ -6,6 +6,8 @@ use log::{Level, Log, Metadata, Record};
 
 pub mod protocol;
 
+pub const WIREPLUG_WPCOD_PORT: u16 = 443;
+pub const WIREPLUG_WPCOD_DEV_PORT: u16 = 4430;
 pub const WIREPLUG_STUN_PORT: u16 = 4455;
 pub const WIREPLUG_ORG_STUN1: &str = "stun1.wireplug.org";
 pub const WIREPLUG_ORG_STUN2: &str = "stun2.wireplug.org";

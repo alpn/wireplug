@@ -90,7 +90,7 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         .with_no_client_auth()
         .with_single_cert(cert, key)?;
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-    let wp_listen_addr = format!("{}:443", config.wp_listen_on);
+    let wp_listen_addr = format!("{}:{}", config.wp_listen_on, shared::WIREPLUG_WPCOD_PORT);
     let listener = TcpListener::bind(&wp_listen_addr).await?;
 
     // let async tasks schedule before lockdown
