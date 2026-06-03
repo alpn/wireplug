@@ -69,7 +69,7 @@ pub(crate) fn find_lan_candidates(if_wg: &str, peer_lan_addrs: &Vec<IpNet>) -> V
             for addr in our_lan_addrs {
                 for peer_addr in peer_lan_addrs {
                     if addrs_on_link(&addr, peer_addr) {
-                        candidates.push(peer_addr.clone());
+                        candidates.push(*peer_addr);
                     }
                 }
             }

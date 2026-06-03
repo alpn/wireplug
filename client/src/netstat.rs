@@ -83,10 +83,7 @@ impl NetworkMonitor {
         }
     }
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
-        match &mut self.current {
-            Some(c) => c.hard_nat = hard_nat,
-            None => (),
-        }
+        if let Some(c) = &mut self.current { c.hard_nat = hard_nat }
     }
 
     pub fn check_status(&mut self) -> NetStatus {
@@ -114,7 +111,7 @@ impl NetworkMonitor {
         let new_info = Some(new_info);
         if current.offline() && new_info == self.last_online {
             log::trace!("Network: changed to previous");
-            let last_online_hard_nat = self.last_online.as_ref().map_or(false, |lo| lo.hard_nat);
+            let last_online_hard_nat = self.last_online.as_ref().is_some_and(|lo| lo.hard_nat);
             self.current = new_info;
             return match last_online_hard_nat {
                 true => NetStatus::HardNat,
@@ -132,6 +129,6 @@ impl NetworkMonitor {
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
-        self.current.as_ref().map_or(false, |c| c.hard_nat)
+        self.current.as_ref().is_some_and(|c| c.hard_nat)
     }
 }
