@@ -18,7 +18,6 @@ use openbsd::{pledge, unveil};
 
 use crate::peering::{SharedStorage, Storage};
 use crate::relay::SharedRelayManager;
-use crate::server::ServerStats;
 
 pub mod config;
 #[cfg(target_os = "openbsd")]

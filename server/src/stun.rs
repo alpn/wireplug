@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use shared::protocol::{self, WireplugStunRequest};
+use shared::protocol::{self};
 use tokio::net::UdpSocket;
 
 pub async fn start_serving(bind_to: String) {

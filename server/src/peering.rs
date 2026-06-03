@@ -164,7 +164,7 @@ pub(crate) async fn process_announcement(
 ) -> std::io::Result<()> {
     let announing_peer_ipv4 = match announcing_peer_addr.ip() {
         IpAddr::V4(ipv4_addr) => ipv4_addr,
-        IpAddr::V6(ipv6_addr) => {
+        IpAddr::V6(_) => {
             return Err(std::io::Error::other("bad ip"));
         }
     };

@@ -141,7 +141,7 @@ impl RelayManager {
     }
 
     // XXX
-    pub(crate) async fn wait_for_protos(&mut self) -> std::io::Result<()> {
+    pub(crate) async fn _wait_for_protos(&mut self) -> std::io::Result<()> {
         let work = self.proto.drain().map(|((a, b), proto)| async move {
             match port_mapping::detect_source_port(&proto.a_ip, proto.relay_port)
                 .await
@@ -156,7 +156,7 @@ impl RelayManager {
         });
 
         join_all(work).await.iter().for_each(|thing| {
-            if let Some(((a, b), pending)) = thing {
+            if let Some(((_a, _b), _pending)) = thing {
                 // XXX
                 // if we got a port:
                 //  if we have a matching pending, establish (pf) and promote to established
@@ -167,7 +167,7 @@ impl RelayManager {
         Ok(())
     }
 
-    pub fn remove_for_pair(&mut self, peer_a: &String, peer_b: &String) {
+    pub fn remove_for_pair(&mut self, _peer_a: &String, _peer_b: &String) {
         // remove peers' protos and pending
         // destroy (pf) and remove established
     }
@@ -227,6 +227,6 @@ impl WriteTo for EstablishedRelay {
     }
 }
 
-fn get_free_random_port() -> u16 {
+fn _get_free_random_port() -> u16 {
     todo!()
 }
