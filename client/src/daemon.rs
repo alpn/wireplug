@@ -3,7 +3,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ipnet::IpNet;
 use wireguard_control::Key;
 
 use crate::{

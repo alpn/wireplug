@@ -1,7 +1,7 @@
 use ipnet::IpNet;
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{Ipv4Addr, Ipv6Addr},
 };
 
 pub const WIREPLUG_PROTOCOL_MAGIC: [u8; 3] = [0xFD, 0xAC, 0xAF];

@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use ipnet::IpNet;
 
@@ -26,13 +26,14 @@ impl PartialEq for NetInfo {
 
 impl NetInfo {
     fn detect(if_name: &str) -> Self {
-        let (mut wan_ipv4, wan_ipv6) = innernet_publicip::get_both();
+        let (mut wan_ipv4, mut wan_ipv6) = innernet_publicip::get_both();
         if wan_ipv4.is_none() && wan_ipv6.is_none() {
-            wan_ipv4 = utils::get_ip_over_https();
-            if wan_ipv4.is_some() {
+            (wan_ipv4, wan_ipv6) = utils::get_ip64_over_https();
+            if wan_ipv4.is_some() || wan_ipv6.is_some(){
                 log::warn!(
-                    "Network: quad9 is unreachable, ip found via HTTPS {:?}",
-                    wan_ipv4
+                    "Network: quad9 is unreachable, ip found via HTTPS {:?} / {:?}",
+                    wan_ipv4,
+                    wan_ipv6
                 );
             }
         }

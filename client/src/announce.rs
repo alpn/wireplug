@@ -1,4 +1,3 @@
-use ipnet::IpNet;
 use shared::{
     self, WIREPLUG_ORG_WP,
     protocol::{self, WireplugResponse},
