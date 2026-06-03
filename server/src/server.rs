@@ -124,7 +124,7 @@ pub(crate) async fn serve(
             }
         };
         let acceptor = acceptor.clone();
-        let s = Arc::clone(&storage);
+        let s = Arc::clone(storage);
         let rm = Arc::clone(&relay_manager);
         let ss = Arc::clone(&server_stats);
 

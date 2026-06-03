@@ -70,8 +70,8 @@ pub struct NormalizedKey(pub [u8; 64]);
 
 // XXX
 fn tmp_string_to_bytes(_s: &String) -> [u8; 32] {
-    let out = [0u8; 32];
-    out
+    
+    [0u8; 32]
 }
 
 // XXX
@@ -97,6 +97,12 @@ pub struct RelayManager {
 }
 
 pub type SharedRelayManager = Arc<RwLock<RelayManager>>;
+
+impl Default for RelayManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl RelayManager {
     pub fn new() -> Self {
@@ -143,16 +149,12 @@ impl RelayManager {
     // XXX
     pub(crate) async fn _wait_for_protos(&mut self) -> std::io::Result<()> {
         let work = self.proto.drain().map(|((a, b), proto)| async move {
-            match port_mapping::detect_source_port(&proto.a_ip, proto.relay_port)
+            port_mapping::detect_source_port(&proto.a_ip, proto.relay_port)
                 .await
-                .ok()
-            {
-                Some(observed_source_port) => Some((
+                .ok().map(|observed_source_port| (
                     (a, b),
                     PendingRelay::new(proto.a_ip, observed_source_port, proto.relay_port),
-                )),
-                None => None,
-            }
+                ))
         });
 
         join_all(work).await.iter().for_each(|thing| {
@@ -183,7 +185,7 @@ impl RelayManager {
             let port = r.a_oport;
             writeln!(writer, "{a} => {b} {ip}:{port} (pending)")?;
         }
-        for (_, r) in &self.established {
+        for r in self.established.values() {
             writeln!(
                 writer,
                 "{}:{} <=> {}:{} (established)",
