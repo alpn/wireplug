@@ -117,6 +117,9 @@ mod tests {
     #[test]
     fn it_works() {
         let (ipv4, ipv6) = get_ip64_over_https();
-        assert!(ipv4.is_some() || ipv6.is_some(),"get_ip64_over_https() failed");
+        assert!(
+            ipv4.is_some() || ipv6.is_some(),
+            "get_ip64_over_https() failed"
+        );
     }
 }

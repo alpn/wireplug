@@ -29,7 +29,7 @@ impl NetInfo {
         let (mut wan_ipv4, mut wan_ipv6) = innernet_publicip::get_both();
         if wan_ipv4.is_none() && wan_ipv6.is_none() {
             (wan_ipv4, wan_ipv6) = utils::get_ip64_over_https();
-            if wan_ipv4.is_some() || wan_ipv6.is_some(){
+            if wan_ipv4.is_some() || wan_ipv6.is_some() {
                 log::warn!(
                     "Network: quad9 is unreachable, ip found via HTTPS {:?} / {:?}",
                     wan_ipv4,
@@ -72,12 +72,6 @@ pub(crate) enum NetStatus {
     Online,
     HardNat,
     Offline,
-}
-pub(crate) enum ExternalIpKind {
-    None,
-    Ipv4,
-    Ipv6,
-    Both,
 }
 
 impl NetworkMonitor {
@@ -139,17 +133,5 @@ impl NetworkMonitor {
 
     pub(crate) fn needs_relay(&self) -> bool {
         self.current.as_ref().map_or(false, |c| c.hard_nat)
-    }
-
-    pub(crate) fn _get_external_ip_kind(&self) -> ExternalIpKind {
-        let Some(current) = &self.current else {
-            return ExternalIpKind::None;
-        };
-        match (current.wan_ipv4, current.wan_ipv6) {
-            (Some(_), Some(_)) => ExternalIpKind::Both,
-            (Some(_), None) => ExternalIpKind::Ipv4,
-            (None, Some(_)) => ExternalIpKind::Ipv6,
-            (None, None) => ExternalIpKind::None,
-        }
     }
 }

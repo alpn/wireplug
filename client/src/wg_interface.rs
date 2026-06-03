@@ -362,12 +362,6 @@ pub(crate) fn update_port(ifname: &str, new_port: u16) -> Result<(), std::io::Er
     Ok(())
 }
 
-pub(crate) fn get_port(ifname: &str) -> Option<u16> {
-    let ifname: InterfaceName = ifname.parse().ok()?;
-    let dev = Device::get(&ifname, Backend::default()).ok()?;
-    dev.listen_port
-}
-
 pub(crate) fn init_peers_activity(
     if_name: &str,
     peer_tracker: &mut PeerTracker,
