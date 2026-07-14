@@ -70,7 +70,6 @@ pub struct NormalizedKey(pub [u8; 64]);
 
 // XXX
 fn tmp_string_to_bytes(_s: &String) -> [u8; 32] {
-    
     [0u8; 32]
 }
 
@@ -151,10 +150,13 @@ impl RelayManager {
         let work = self.proto.drain().map(|((a, b), proto)| async move {
             port_mapping::detect_source_port(&proto.a_ip, proto.relay_port)
                 .await
-                .ok().map(|observed_source_port| (
-                    (a, b),
-                    PendingRelay::new(proto.a_ip, observed_source_port, proto.relay_port),
-                ))
+                .ok()
+                .map(|observed_source_port| {
+                    (
+                        (a, b),
+                        PendingRelay::new(proto.a_ip, observed_source_port, proto.relay_port),
+                    )
+                })
         });
 
         join_all(work).await.iter().for_each(|thing| {
