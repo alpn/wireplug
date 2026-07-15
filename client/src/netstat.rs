@@ -1,4 +1,7 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::{
+    fmt::Display,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 
 use ipnet::IpNet;
 
@@ -24,6 +27,26 @@ impl PartialEq for NetInfo {
     }
 }
 
+impl Display for NetInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\tPublic IPv4: ")?;
+        if let Some(ip) = self.wan_ipv4 {
+            writeln!(f, "{ip}")?;
+        } else {
+            writeln!(f, "N/A")?;
+        }
+        write!(f, "\tPublic IPv6: ")?;
+        if let Some(ip) = self.wan_ipv6 {
+            writeln!(f, "{ip}")?;
+        } else {
+            writeln!(f, "N/A")?;
+        }
+        for l in &self.lan_addrs {
+            writeln!(f, "\tLAN IP: {:?}", l)?;
+        }
+        Ok(())
+    }
+}
 impl NetInfo {
     fn detect(if_name: &str) -> Self {
         let (mut wan_ipv4, mut wan_ipv6) = innernet_publicip::get_both();
@@ -83,7 +106,9 @@ impl NetworkMonitor {
         }
     }
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
-        if let Some(c) = &mut self.current { c.hard_nat = hard_nat }
+        if let Some(c) = &mut self.current {
+            c.hard_nat = hard_nat
+        }
     }
 
     pub fn check_status(&mut self) -> NetStatus {

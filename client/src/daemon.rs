@@ -1,4 +1,6 @@
 use std::{
+    io::Write,
+    os::unix::net::UnixStream,
     thread::{self},
     time::{Duration, Instant},
 };
@@ -47,6 +49,19 @@ pub(crate) fn handle_inactive_peers(
     Ok(())
 }
 
+fn show_stats(ifname: &str, net_info: Option<NetInfo>) -> anyhow::Result<()> {
+    let mut s = UnixStream::connect("/var/run/wireplugd.sock")?;
+    write!(s, "\x1B[2J\x1B[1;1H")?;
+    writeln!(s, "Network:\n-------")?;
+    match net_info {
+        Some(n) => writeln!(s, "{n}")?,
+        None => writeln!(s, "\tN/A")?,
+    }
+    let peer_info = wg_interface::get_peer_info(ifname)?;
+    s.write_all(peer_info.as_bytes())?;
+    Ok(())
+}
+
 pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new(ifname);
     let mut peers_manager = wg_interface::PeerTracker::new();
@@ -59,6 +74,9 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     let mut inactive_peers = vec![];
     let mut port_to_announce = 0;
     loop {
+        if let Err(e) = show_stats(ifname, netmon.get_current()) {
+            log::warn!("could not show stats: {e}");
+        }
         match netmon.check_status() {
             netstat::NetStatus::Online | netstat::NetStatus::ChangedToPrev => (),
             netstat::NetStatus::Offline | netstat::NetStatus::HardNat => {
@@ -111,8 +129,6 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                 port_to_announce,
                 netmon.needs_relay(),
             )?;
-        } else {
-            wg_interface::show_peers(ifname)?;
         }
         thread::sleep(Duration::from_secs(10));
     }

@@ -1,3 +1,4 @@
+use std::fmt::Write as OtherWrite;
 #[cfg(not(target_os = "linux"))]
 use std::io;
 use std::{
@@ -92,10 +93,11 @@ pub(crate) fn show_config(ifname: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub(crate) fn show_peers(ifname: &str) -> anyhow::Result<()> {
+pub(crate) fn get_peer_info(ifname: &str) -> anyhow::Result<String> {
     let ifname: InterfaceName = ifname.parse()?;
     let dev = Device::get(&ifname, Backend::default())?;
-    log::debug!("peers:");
+    let mut w = String::new();
+    writeln!(w, "Peers:\n------")?;
     let now = SystemTime::now();
     for peer in dev.peers {
         let last_handshake = match peer.stats.last_handshake_time {
@@ -105,12 +107,10 @@ pub(crate) fn show_peers(ifname: &str) -> anyhow::Result<()> {
                 .to_string(),
             None => "NA".to_string(),
         };
-        log::debug!(
-            "\t{} last handshake: {last_handshake}",
-            peer.config.public_key.to_base64()
-        );
+        let peer = peer.config.public_key.to_base64();
+        writeln!(w, "\t{peer} last handshake: {last_handshake}")?;
     }
-    Ok(())
+    Ok(w)
 }
 
 #[cfg(any(target_os = "macos", target_os = "openbsd"))]
