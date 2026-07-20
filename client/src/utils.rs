@@ -111,7 +111,7 @@ pub(crate) fn get_ip64_over_https() -> (Option<Ipv4Addr>, Option<std::net::Ipv6A
     (ipv4, ipv6)
 }
 
-pub(crate) fn get_size_str(size: u64) -> anyhow::Result<String>{
+pub(crate) fn get_size_str(size: u64) -> anyhow::Result<String> {
     let mut str = String::new();
     match size {
         0..=1023 => write!(str, "{size}Bytes")?,

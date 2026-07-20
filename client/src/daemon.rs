@@ -86,17 +86,27 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             netstat::NetStatus::ChangedToNew => {
                 let new_port = utils::get_random_port();
                 port_to_announce = match traverse_nat {
-                    true => match nat::detect_kind(new_port)? {
-                        nat::NatKind::Easy => new_port,
-                        nat::NatKind::FixedPortMapping(port_mapping_nat) => {
-                            port_mapping_nat.obsereved_port
+                    true => {
+                        let nat_kind = match nat::detect_kind(new_port) {
+                            Ok(res) => res,
+                            Err(e) => {
+                                log::warn!("failed to perform NAT detection: {e}");
+                                thread::sleep(Duration::from_secs(5));
+                                continue;
+                            }
+                        };
+                        match nat_kind {
+                            nat::NatKind::Easy => new_port,
+                            nat::NatKind::FixedPortMapping(port_mapping_nat) => {
+                                port_mapping_nat.obsereved_port
+                            }
+                            nat::NatKind::Hard => {
+                                log::warn!("Destination-Dependent NAT detected");
+                                netmon.set_hard_nat(true);
+                                new_port
+                            }
                         }
-                        nat::NatKind::Hard => {
-                            log::warn!("Destination-Dependent NAT detected");
-                            netmon.set_hard_nat(true);
-                            new_port
-                        }
-                    },
+                    }
                     false => new_port,
                 };
 
