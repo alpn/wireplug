@@ -1,3 +1,4 @@
+use std::fmt::Write as OtherWrite;
 use std::{
     io::{Read, Write},
     net::{Ipv4Addr, TcpStream},
@@ -110,6 +111,21 @@ pub(crate) fn get_ip64_over_https() -> (Option<Ipv4Addr>, Option<std::net::Ipv6A
     (ipv4, ipv6)
 }
 
+pub(crate) fn get_size_str(size: u64) -> anyhow::Result<String>{
+    let mut str = String::new();
+    match size {
+        0..=1023 => write!(str, "{size}Bytes")?,
+        1024..=1048575 => {
+            let size = size / 1024;
+            write!(str, "{size}KiB")?
+        }
+        1048576.. => {
+            let size = size as f64 / (1024.0 * 1024.0);
+            write!(str, "{size:.2}MiB")?
+        }
+    }
+    Ok(str)
+}
 #[cfg(test)]
 mod tests {
     use crate::utils::get_ip64_over_https;

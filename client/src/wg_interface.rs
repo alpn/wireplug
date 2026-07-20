@@ -99,7 +99,21 @@ pub(crate) fn get_peer_info(ifname: &str) -> anyhow::Result<String> {
     let mut w = String::new();
     writeln!(w, "Peers:\n------")?;
     let now = SystemTime::now();
-    for peer in dev.peers {
+    let mut peers = dev.peers.clone();
+    peers.sort_by(|a, b| {
+        a.config
+            .public_key
+            .as_bytes()
+            .cmp(b.config.public_key.as_bytes())
+    });
+    for peer in peers {
+        let peer_pubkey = peer.config.public_key.to_base64();
+        writeln!(w, "\tpublic key: {peer_pubkey}")?;
+        write!(w, "\tendpoint: ")?;
+        match peer.config.endpoint {
+            Some(e) => writeln!(w, "{e}")?,
+            None => writeln!(w, "N/A")?,
+        };
         let last_handshake = match peer.stats.last_handshake_time {
             Some(last_handshake_time) => now
                 .duration_since(last_handshake_time)?
@@ -107,8 +121,13 @@ pub(crate) fn get_peer_info(ifname: &str) -> anyhow::Result<String> {
                 .to_string(),
             None => "NA".to_string(),
         };
-        let peer = peer.config.public_key.to_base64();
-        writeln!(w, "\t{peer} last handshake: {last_handshake}")?;
+        writeln!(w, "\tlast handshake: {last_handshake} seconds ago")?;
+        writeln!(w, "\ttx: {}", utils::get_size_str(peer.stats.tx_bytes)?)?;
+        writeln!(w, "\trx: {}", utils::get_size_str(peer.stats.rx_bytes)?)?;
+        writeln!(
+            w,
+            "\t--------------------------------------------------------"
+        )?;
     }
     Ok(w)
 }
