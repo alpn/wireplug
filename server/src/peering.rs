@@ -57,7 +57,7 @@ impl Storage {
             peering_records: HashMap::new(),
         }
     }
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> std::fmt::Result {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> anyhow::Result<()> {
         let now = SystemTime::now();
         for p in self.peering_records.iter() {
             let peer_a = &p.0.0;
@@ -66,7 +66,7 @@ impl Storage {
             let ipv6 = &p.1.wan_ipv6;
             let lan = &p.1.lan_addrs;
             let timestamp = &p.1.timestamp;
-            let sec = now.duration_since(*timestamp).unwrap().as_secs();
+            let sec = now.duration_since(*timestamp)?.as_secs();
             writeln!(
                 writer,
                 "\t{peer_a} @{:?}/{:?} (LAN: {:?} -> {peer_b}) | {sec} sec ago",
