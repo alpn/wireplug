@@ -44,6 +44,11 @@ impl Display for NetInfo {
         for l in &self.lan_addrs {
             writeln!(f, "\tLAN IP: {:?}", l)?;
         }
+        write!(f, "\tNAT: ")?;
+        match self.hard_nat {
+            true => writeln!(f, "relay required")?,
+            false => writeln!(f, "easy")?,
+        };
         Ok(())
     }
 }
