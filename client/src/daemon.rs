@@ -49,13 +49,18 @@ pub(crate) fn handle_inactive_peers(
     Ok(())
 }
 
-fn show_stats(ifname: &str, net_info: Option<NetInfo>) -> anyhow::Result<()> {
+fn show_stats(ifname: &str, net_info: Option<NetInfo>, port: Option<u16>) -> anyhow::Result<()> {
     let mut s = UnixStream::connect("/var/run/wireplugd.sock")?;
     write!(s, "\x1B[2J\x1B[1;1H")?;
     writeln!(s, "Network:\n-------")?;
     match net_info {
         Some(n) => writeln!(s, "{n}")?,
-        None => writeln!(s, "\tN/A")?,
+        None => writeln!(s, "\tN/A\n")?,
+    }
+    write!(s, "\tWireGuard Port: ")?;
+    match port {
+        Some(p) => writeln!(s, "{p}")?,
+        None => writeln!(s, "N/A")?,
     }
     let peer_info = wg_interface::get_peer_info(ifname)?;
     s.write_all(peer_info.as_bytes())?;
@@ -72,9 +77,9 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
     let peer_is_inactive_duration = Duration::from_secs(25);
     let mut next_inactivity_check = Instant::now() + peer_is_inactive_duration;
     let mut inactive_peers = vec![];
-    let mut port_to_announce = 0;
+    let mut port_to_announce = None;
     loop {
-        if let Err(e) = show_stats(ifname, netmon.get_current()) {
+        if let Err(e) = show_stats(ifname, netmon.get_current(), port_to_announce) {
             log::warn!("could not show stats: {e}");
         }
         match netmon.check_status() {
@@ -85,7 +90,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             }
             netstat::NetStatus::ChangedToNew => {
                 let new_port = utils::get_random_port();
-                port_to_announce = match traverse_nat {
+                port_to_announce = Some(match traverse_nat {
                     true => {
                         let nat_kind = match nat::detect_kind(new_port) {
                             Ok(res) => res,
@@ -108,7 +113,7 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
                         }
                     }
                     false => new_port,
-                };
+                });
 
                 log::debug!("updating listen port to {new_port} ..");
                 // wait before reusing the port
@@ -129,6 +134,10 @@ pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::
             log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
             let Some(netinfo) = netmon.get_current() else {
                 log::warn!("no NetInfo - skipping");
+                continue;
+            };
+            let Some(port_to_announce) = port_to_announce else {
+                log::warn!("no port_to_announce - skipping");
                 continue;
             };
             handle_inactive_peers(
