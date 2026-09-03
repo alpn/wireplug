@@ -67,8 +67,8 @@ fn show_stats(ifname: &str, net_info: Option<NetInfo>, port: Option<u16>) -> any
     Ok(())
 }
 
-pub(crate) fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new(ifname);
+pub(crate) async fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
     let mut peers_manager = wg_interface::PeerTracker::new();
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 

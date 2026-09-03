@@ -45,6 +45,10 @@ fn start(
     log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
     log::info!("starting");
 
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
     #[cfg(not(target_os = "macos"))]
     wg_interface::show_config(ifname)?;
 
