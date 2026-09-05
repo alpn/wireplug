@@ -1,13 +1,17 @@
 use std::{
+    collections::HashSet,
     fmt::Display,
     net::{Ipv4Addr, Ipv6Addr},
 };
 
 use ipnet::IpNet;
 
+use n0_future::StreamExt;
+use n0_watcher::{self, Watcher};
+
 use crate::utils;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct NetInfo {
     wan_ipv4: Option<Ipv4Addr>,
     pub(crate) wan_ipv6: Option<Ipv6Addr>,
@@ -87,33 +91,28 @@ impl NetInfo {
     }
 }
 
-#[derive(Clone)]
 pub(crate) struct NetworkMonitor {
-    current: Option<NetInfo>,
+    nw_monitor: netwatch::netmon::Monitor,
+    nw_stream: n0_watcher::Stream<n0_watcher::Direct<netwatch::netmon::State>>,
+    current: NetInfo,
     last_online: Option<NetInfo>,
     wg_if_name: String,
 }
 
-pub(crate) enum NetStatus {
-    ChangedToNew,
-    ChangedToPrev,
-    Online,
-    HardNat,
-    Offline,
-}
-
 impl NetworkMonitor {
-    pub fn new(wg_if_name: &str) -> Self {
-        Self {
-            current: None,
+    pub async fn new(wg_if_name: &str) -> anyhow::Result<Self> {
+        let nm = netwatch::netmon::Monitor::new().await?;
+        let netwatch_stream = nm.interface_state().stream_updates_only();
+        Ok(Self {
+            nw_monitor: nm,
+            nw_stream: netwatch_stream,
+            current: NetInfo::default(),
             last_online: None,
             wg_if_name: wg_if_name.to_owned(),
-        }
+        })
     }
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
-        if let Some(c) = &mut self.current {
-            c.hard_nat = hard_nat
-        }
+        self.current.hard_nat = hard_nat;
     }
 
     pub fn check_status(&mut self) -> NetStatus {
