@@ -83,17 +83,16 @@ impl NetInfo {
             hard_nat: false,
         }
     }
-    fn online(&self) -> bool {
+    pub(crate) fn online(&self) -> bool {
         self.wan_ipv4.is_some() || self.wan_ipv6.is_some()
     }
-    fn offline(&self) -> bool {
+    pub(crate) fn offline(&self) -> bool {
         !self.online()
     }
 }
 
 pub(crate) struct NetworkMonitor {
     nw_monitor: netwatch::netmon::Monitor,
-    nw_stream: n0_watcher::Stream<n0_watcher::Direct<netwatch::netmon::State>>,
     current: NetInfo,
     last_online: Option<NetInfo>,
     wg_if_name: String,
@@ -102,10 +101,8 @@ pub(crate) struct NetworkMonitor {
 impl NetworkMonitor {
     pub async fn new(wg_if_name: &str) -> anyhow::Result<Self> {
         let nm = netwatch::netmon::Monitor::new().await?;
-        let netwatch_stream = nm.interface_state().stream_updates_only();
         Ok(Self {
             nw_monitor: nm,
-            nw_stream: netwatch_stream,
             current: NetInfo::default(),
             last_online: None,
             wg_if_name: wg_if_name.to_owned(),
@@ -114,50 +111,83 @@ impl NetworkMonitor {
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
         self.current.hard_nat = hard_nat;
     }
+    pub async fn monitor_endpoint_change(&mut self) -> anyhow::Result<()> {
+        if self.last_online.is_none() && self.detect_public_ip_change() {
+            return Ok(());
+        }
+        let mut nw_stream = self.nw_monitor.interface_state().stream_updates_only();
+        loop {
+            let Some(state) = nw_stream.next().await else {
+                return Err(anyhow::anyhow!(
+                    "netmon: stream has ended due to underlying actor shutting down"
+                ));
+            };
+            let Some(default_route_interface_name) = state.default_route_interface else {
+                log::warn!("netmon: no deafult route");
+                continue;
+            };
 
-    pub fn check_status(&mut self) -> NetStatus {
-        let new_info = NetInfo::detect(&self.wg_if_name);
-        log::trace!("Network: {new_info:?}");
+            let Some(default_route_interface) = state.interfaces.get(&default_route_interface_name)
+            else {
+                log::warn!("netmon: could not get deafult route interface");
+                continue;
+            };
 
-        let Some(current) = self.current.clone() else {
-            self.current = Some(new_info.clone());
-            self.last_online = Some(new_info);
-            return NetStatus::ChangedToNew;
-        };
-        if new_info.offline() {
-            if current.online() {
-                log::debug!("Network: changed to Offline");
+            if self.current.lan_addrs.is_empty() {
+                log::warn!("netmon: no LAN address");
+                continue;
             }
-            self.current = Some(new_info);
-            return NetStatus::Offline;
+
+            let current_lan_set: HashSet<_> = self.current
+                .lan_addrs
+                .clone()
+                .into_iter()
+                .filter_map(|addr| match addr {
+                    IpNet::V4(ipv4_net) => Some(ipv4_net),
+                    IpNet::V6(_) => None,
+                })
+                .collect();
+
+            let new_lan_set: HashSet<_> = default_route_interface
+                .addrs()
+                .filter_map(|addr| match addr {
+                    netwatch::interfaces::IpNet::V4(ipv4_net) => Some(ipv4_net),
+                    _ => None,
+                })
+                .collect();
+
+            if current_lan_set != new_lan_set {
+                log::debug!(
+                    "netmon: local ip changed {:?} -> {:?}",
+                    current_lan_set,
+                    new_lan_set
+                );
+                if self.detect_public_ip_change() {
+                    log::info!("netmon: new public ip");
+                    return Ok(());
+                }
+            }
         }
-        if new_info == current {
-            return match self.current.as_ref().is_some_and(|c| c.hard_nat) {
-                true => NetStatus::HardNat,
-                false => NetStatus::Online,
-            };
+    }
+    pub fn detect_public_ip_change(&mut self) -> bool {
+        self.current = NetInfo::detect(&self.wg_if_name);
+        if self.current.offline() {
+            log::debug!("netmon: Offline");
+            return false;
         }
-        let new_info = Some(new_info);
-        if current.offline() && new_info == self.last_online {
-            log::trace!("Network: changed to previous");
-            let last_online_hard_nat = self.last_online.as_ref().is_some_and(|lo| lo.hard_nat);
-            self.current = new_info;
-            return match last_online_hard_nat {
-                true => NetStatus::HardNat,
-                false => NetStatus::ChangedToPrev,
-            };
+        log::debug!("netmon: Online");
+        let last_online = self.last_online.replace(self.current.clone());
+        match last_online {
+            Some(last_online) => last_online.wan_ipv4 != self.current.wan_ipv4,
+            None => true,
         }
-        log::debug!("Network: changed to new {:?}", &new_info);
-        self.current = new_info.clone();
-        self.last_online = new_info;
-        NetStatus::ChangedToNew
     }
 
     pub(crate) fn get_current(&self) -> Option<NetInfo> {
-        self.current.clone()
+        Some(self.current.clone())
     }
 
     pub(crate) fn needs_relay(&self) -> bool {
-        self.current.as_ref().is_some_and(|c| c.hard_nat)
+        self.current.hard_nat
     }
 }
