@@ -33,8 +33,8 @@ fn send_stun_request(
 ) -> Result<protocol::WireplugStunResponse, std::io::Error> {
     let mut buf = Vec::with_capacity(std::mem::size_of::<protocol::WireplugStunRequest>() + 4);
 
-    buf.write(&protocol::WIREPLUG_PROTOCOL_MAGIC)?;
-    buf.write(&protocol::WIREPLUG_PROTOCOL_VERSION)?;
+    buf.write_all(&protocol::WIREPLUG_PROTOCOL_MAGIC)?;
+    buf.write_all(&protocol::WIREPLUG_PROTOCOL_VERSION)?;
 
     let request = protocol::WireplugStunRequest::new(local_port);
     buf = postcard::to_extend(&request, buf)
