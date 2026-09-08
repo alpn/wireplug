@@ -61,7 +61,9 @@ fn start(
     wg_interface::configure(ifname, config)?;
     log::info!("interface configured");
     wg_interface::show_config(ifname)?;
-    daemon::monitor_interface(ifname, traverse_nat)?;
+
+    rt.block_on(daemon::monitor_interface(ifname, traverse_nat))?;
+
     Ok(())
 }
 
