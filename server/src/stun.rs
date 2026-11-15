@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use shared::protocol::{self};
 use tokio::net::UdpSocket;
 
-pub async fn start_serving(bind_to: String) {
+pub async fn start_serving(bind_to: SocketAddr) {
     let socket = match UdpSocket::bind(bind_to).await {
         Ok(s) => s,
         Err(e) => {
