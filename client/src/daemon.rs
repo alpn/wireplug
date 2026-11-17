@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub(crate) fn handle_inactive_peers(
-    ifname: &String,
+    ifname: &str,
     peer_tracker: &mut wg_interface::PeerTracker,
     mut peers: Vec<Key>,
     netinfo: NetInfo,
@@ -67,7 +67,7 @@ fn show_stats(ifname: &str, net_info: Option<NetInfo>, port: Option<u16>) -> any
     Ok(())
 }
 
-pub(crate) async fn monitor_interface(ifname: &String, traverse_nat: bool) -> anyhow::Result<()> {
+pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyhow::Result<()> {
     let mut netmon = netstat::NetworkMonitor::new(ifname).await?;
     let mut peers_manager = wg_interface::PeerTracker::new();
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;

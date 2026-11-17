@@ -60,7 +60,7 @@ fn send_announcement<S: Read + Write>(
 }
 
 pub(crate) fn announce(
-    if_name: &String,
+    if_name: &str,
     peers: &[Key],
     announcement_port: u16,
     netinfo: &NetInfo,
