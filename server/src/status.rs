@@ -1,19 +1,35 @@
 use std::fmt::Write as OtherWrite;
 use std::time::Duration;
 
-use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
+use tokio::sync::Mutex;
+use tokio::{io::AsyncWriteExt, net::UnixListener};
 
 use crate::{SharedRelayManager, SharedStorage, server::SharedServerStats};
 
-pub static MON_SOCK: &str = "/var/run/wpcod/wpcod.sock";
+pub(crate) static MON_SOCK: &str = "/var/run/wpcod.sock";
 
 pub(crate) async fn start_writer(
+    unix_listener: UnixListener,
     storage: SharedStorage,
     relay_manager: SharedRelayManager,
     server_stats: SharedServerStats,
 ) -> anyhow::Result<()> {
-    let mut prev_ok = true;
+    let clients = std::sync::Arc::new(Mutex::new(Vec::<UnixStream>::new()));
+    let c = std::sync::Arc::clone(&clients);
+    tokio::spawn(async move {
+        loop {
+            match unix_listener.accept().await {
+                Ok((s, _)) => {
+                    log::warn!("new monitoring client connected");
+                    c.lock().await.push(s);
+                }
+                Err(e) => {
+                    log::warn!("monitoring client failed to connect: {e}");
+                }
+            }
+        }
+    });
     loop {
         let mut writer = String::new();
         write!(writer, "\x1B[2J\x1B[1;1H")?;
@@ -23,21 +39,17 @@ pub(crate) async fn start_writer(
         relay_manager.read().await.write_to(&mut writer)?;
         writeln!(writer, "\n\nStats:\n------")?;
         server_stats.read().await.write_to(&mut writer)?;
-        match UnixStream::connect(MON_SOCK).await {
-            Ok(mut unix_stream) => {
-                if let Err(e) = unix_stream.write_all(writer.as_bytes()).await {
-                    log::warn!("monitoring socket: {e}");
-                } else {
-                    prev_ok = true;
-                }
+
+        let mut guard = clients.lock().await;
+        let mut kept_clients = vec![];
+        for mut c in guard.drain(..) {
+            if let Err(e) = c.write_all(writer.as_bytes()).await {
+                log::warn!("bad monitoring client {e}");
+            } else {
+                kept_clients.push(c);
             }
-            Err(e) => {
-                if prev_ok {
-                    prev_ok = false;
-                    log::warn!("failed to open monitoring socket: {e}");
-                }
-            }
-        };
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        }
+        *guard = kept_clients;
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

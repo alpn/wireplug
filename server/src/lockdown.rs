@@ -1,11 +1,11 @@
 static WPCOD_USER: &str = "_wpcod\x00";
 
 pub fn step1() -> anyhow::Result<()> {
-    openbsd::pledge!("stdio inet rpath unix unveil id", "")?;
+    openbsd::pledge!("stdio inet rpath cpath unix unveil id fattr", "")?;
     openbsd::unveil!("/etc", "r")?;
-    openbsd::unveil!(crate::status::MON_SOCK, "rw")?;
+    openbsd::unveil!(crate::status::MON_SOCK, "crw")?;
     openbsd::unveil::disable();
-    openbsd::pledge!("stdio inet rpath unix id", "")?;
+    openbsd::pledge!("stdio inet rpath cpath unix id fattr", "")?;
     Ok(())
 }
 

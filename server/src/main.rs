@@ -1,4 +1,7 @@
 use clap::Parser;
+use std::fs;
+use std::net::SocketAddr;
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -8,6 +11,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
 use shared::TmpLogger;
 use tokio::net::TcpListener;
+use tokio::net::UnixListener;
 use tokio::sync::RwLock;
 
 use rustls::pki_types::pem::PemObject;
@@ -18,6 +22,7 @@ use openbsd::{pledge, unveil};
 
 use crate::peering::{SharedStorage, Storage};
 use crate::relay::SharedRelayManager;
+use crate::status::MON_SOCK;
 
 pub mod config;
 #[cfg(target_os = "openbsd")]
@@ -58,14 +63,26 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     let server_stats = Arc::new(RwLock::new(server::ServerStats::new()));
 
     if cli.monitor {
-        let s = Arc::clone(&storage);
-        let rm = Arc::clone(&relay_manager);
-        let ss = Arc::clone(&server_stats);
-        tokio::spawn(async move {
-            if let Err(e) = status::start_writer(s, rm, ss).await {
-                log::error!("{e}");
+        if let Err(e) = fs::remove_file(MON_SOCK) {
+            log::warn!("failed to unlink monitoring socket {}: {e}", MON_SOCK);
+        } else {
+            match UnixListener::bind(MON_SOCK) {
+                Ok(unix_listener) => {
+                    fs::set_permissions(MON_SOCK, fs::Permissions::from_mode(0o666))?;
+                    let s = Arc::clone(&storage);
+                    let rm = Arc::clone(&relay_manager);
+                    let ss = Arc::clone(&server_stats);
+                    tokio::spawn(async move {
+                        if let Err(e) = status::start_writer(unix_listener, s, rm, ss).await {
+                            log::error!("{e}");
+                        }
+                    });
+                }
+                Err(e) => {
+                    log::error!("failed to create monitoring socket {}: {e}", MON_SOCK);
+                }
             }
-        });
+        }
     }
 
     let s = Arc::clone(&storage);
