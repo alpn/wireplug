@@ -15,7 +15,7 @@ use wireguard_control::{
 };
 
 use crate::{
-    config::{self, Config},
+    config::{Config},
     utils,
 };
 
@@ -112,6 +112,11 @@ pub(crate) fn get_peer_info(ifname: &str) -> anyhow::Result<String> {
     for peer in peers {
         let peer_pubkey = peer.config.public_key.to_base64();
         writeln!(w, "\tpublic key: {peer_pubkey}")?;
+        write!(w, "\tallowed ips:")?;
+        for aip in &peer.config.allowed_ips {
+            write!(w, " {aip:?}")?;
+        }
+        writeln!(w)?;
         write!(w, "\tendpoint: ")?;
         match peer.config.endpoint {
             Some(e) => writeln!(w, "{e}")?,
