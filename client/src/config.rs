@@ -45,6 +45,7 @@ impl Interface {
 pub(crate) struct Peer {
     pub public_key: String,
     pub allowed_ips: String,
+    pub endpoint: Option<String>,
 }
 
 impl Peer {
@@ -52,6 +53,7 @@ impl Peer {
         Self {
             public_key: String::from("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
             allowed_ips: String::from("10.0.0.2"),
+            endpoint: None,
         }
     }
 }

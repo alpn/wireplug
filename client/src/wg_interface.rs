@@ -14,7 +14,10 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::{config::Config, utils};
+use crate::{
+    config::{self, Config},
+    utils,
+};
 
 pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some
@@ -223,12 +226,25 @@ pub(crate) fn configure(ifname: &str, config: Option<Config>) -> anyhow::Result<
             log::debug!("{ifname}: configuring using config file");
             let mut peers = vec![];
             for peer in &config.peers {
-                let peer_config = PeerConfigBuilder::new(
-                    &Key::from_base64(&peer.public_key)
-                        .map_err(|e| std::io::Error::other(format!("Could not parse key: {e}")))?,
-                )
-                .set_persistent_keepalive_interval(COMMON_PKA)
-                .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32);
+                let peer_config = match &peer.endpoint {
+                    Some(endpoint) => {
+                        let sa = endpoint.parse()?;
+                        log::debug!("peer has a static endpoint: {sa:?}");
+                        PeerConfigBuilder::new(&Key::from_base64(&peer.public_key).map_err(
+                            |e| std::io::Error::other(format!("Could not parse key: {e}")),
+                        )?)
+                        .set_persistent_keepalive_interval(COMMON_PKA)
+                        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32)
+                        .set_endpoint(sa)
+                    }
+                    None => {
+                        PeerConfigBuilder::new(&Key::from_base64(&peer.public_key).map_err(
+                            |e| std::io::Error::other(format!("Could not parse key: {e}")),
+                        )?)
+                        .set_persistent_keepalive_interval(COMMON_PKA)
+                        .add_allowed_ip(IpAddr::from_str(peer.allowed_ips.as_str())?, 32)
+                    }
+                };
                 peers.push(peer_config);
             }
 

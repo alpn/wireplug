@@ -138,7 +138,8 @@ impl NetworkMonitor {
                 continue;
             }
 
-            let current_lan_set: HashSet<_> = self.current
+            let current_lan_set: HashSet<_> = self
+                .current
                 .lan_addrs
                 .clone()
                 .into_iter()
