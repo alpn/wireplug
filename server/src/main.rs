@@ -85,6 +85,18 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         }
     }
 
+    let tls_config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(cert, key)?;
+    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+    let wp_listen_addr = format!("{}:{}", config.wp_listen_on, shared::WIREPLUG_WPCOD_PORT);
+    let listener = TcpListener::bind(&wp_listen_addr).await?;
+
+    // let async tasks schedule before lockdown
+    sleep(Duration::from_secs(1)).await;
+    #[cfg(target_os = "openbsd")]
+    lockdown::step2(cli.monitor)?;
+
     let s = Arc::clone(&storage);
     tokio::spawn(async move {
         loop {
@@ -99,21 +111,10 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
         log::info!("spawning STUN service @{stun_addr:?}");
         tokio::spawn(async move {
             let bind_to = format!("{stun_addr}:{}", shared::WIREPLUG_STUN_PORT);
-            stun::start_serving(bind_to).await;
+            let sa: SocketAddr = bind_to.parse().unwrap();
+            stun::start_serving(sa).await;
         });
     }
-
-    let tls_config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(cert, key)?;
-    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-    let wp_listen_addr = format!("{}:{}", config.wp_listen_on, shared::WIREPLUG_WPCOD_PORT);
-    let listener = TcpListener::bind(&wp_listen_addr).await?;
-
-    // let async tasks schedule before lockdown
-    sleep(Duration::from_secs(1)).await;
-    #[cfg(target_os = "openbsd")]
-    lockdown::step2(cli.monitor)?;
 
     log::info!("serving peer discovery @{wp_listen_addr:?}");
     server::serve(listener, acceptor, &storage, relay_manager, server_stats).await;
