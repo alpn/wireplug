@@ -65,22 +65,21 @@ async fn start(cli: Cli) -> anyhow::Result<()> {
     if cli.monitor {
         if let Err(e) = fs::remove_file(MON_SOCK) {
             log::warn!("failed to unlink monitoring socket {}: {e}", MON_SOCK);
-        } else {
-            match UnixListener::bind(MON_SOCK) {
-                Ok(unix_listener) => {
-                    fs::set_permissions(MON_SOCK, fs::Permissions::from_mode(0o666))?;
-                    let s = Arc::clone(&storage);
-                    let rm = Arc::clone(&relay_manager);
-                    let ss = Arc::clone(&server_stats);
-                    tokio::spawn(async move {
-                        if let Err(e) = status::start_writer(unix_listener, s, rm, ss).await {
-                            log::error!("{e}");
-                        }
-                    });
-                }
-                Err(e) => {
-                    log::error!("failed to create monitoring socket {}: {e}", MON_SOCK);
-                }
+        }
+        match UnixListener::bind(MON_SOCK) {
+            Ok(unix_listener) => {
+                fs::set_permissions(MON_SOCK, fs::Permissions::from_mode(0o666))?;
+                let s = Arc::clone(&storage);
+                let rm = Arc::clone(&relay_manager);
+                let ss = Arc::clone(&server_stats);
+                tokio::spawn(async move {
+                    if let Err(e) = status::start_writer(unix_listener, s, rm, ss).await {
+                        log::error!("{e}");
+                    }
+                });
+            }
+            Err(e) => {
+                log::error!("failed to create monitoring socket {}: {e}", MON_SOCK);
             }
         }
     }
