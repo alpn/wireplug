@@ -6,9 +6,6 @@ use std::{
 
 use ipnet::IpNet;
 
-use n0_future::StreamExt;
-use n0_watcher::{self, Watcher};
-
 use crate::utils;
 
 #[derive(Default, Debug, Clone)]
@@ -91,19 +88,16 @@ impl NetInfo {
     }
 }
 
-pub(crate) struct NetworkMonitor {
-    nw_monitor: netwatch::netmon::Monitor,
+pub(crate) struct NetworkState {
     current: NetInfo,
     last_online: Option<NetInfo>,
     wg_if_name: String,
 }
 
-impl NetworkMonitor {
+impl NetworkState {
     pub async fn new(wg_if_name: &str) -> anyhow::Result<Self> {
-        let nm = netwatch::netmon::Monitor::new().await?;
         Ok(Self {
-            nw_monitor: nm,
-            current: NetInfo::default(),
+            current: NetInfo::detect(wg_if_name),
             last_online: None,
             wg_if_name: wg_if_name.to_owned(),
         })
@@ -111,66 +105,70 @@ impl NetworkMonitor {
     pub fn set_hard_nat(&mut self, hard_nat: bool) {
         self.current.hard_nat = hard_nat;
     }
-    pub async fn monitor_endpoint_change(&mut self) -> anyhow::Result<()> {
-        if self.last_online.is_none() && self.detect_public_ip_change() {
-            return Ok(());
+    pub async fn has_endpoint_changed(&mut self, state: Option<netwatch::netmon::State>) -> bool {
+        if self.last_online.is_none() && self.update_and_detect_public_ip_change() {
+            return true;
         }
-        let mut nw_stream = self.nw_monitor.interface_state().stream_updates_only();
-        loop {
-            let Some(state) = nw_stream.next().await else {
-                return Err(anyhow::anyhow!(
-                    "netmon: stream has ended due to underlying actor shutting down"
-                ));
-            };
-            let Some(default_route_interface_name) = state.default_route_interface else {
-                log::warn!("netmon: no deafult route");
-                continue;
-            };
+        let Some(state) = state else {
+            log::warn!("netmon: stream has ended due to underlying actor shutting down");
+            self.reset();
+            return false;
+        };
+        let Some(default_route_interface_name) = state.default_route_interface else {
+            log::warn!("netmon: no deafult route");
+            self.reset();
+            return false;
+        };
 
-            let Some(default_route_interface) = state.interfaces.get(&default_route_interface_name)
-            else {
-                log::warn!("netmon: could not get deafult route interface");
-                continue;
-            };
+        let Some(default_route_interface) = state.interfaces.get(&default_route_interface_name)
+        else {
+            log::warn!("netmon: could not get deafult route interface");
+            self.reset();
+            return false;
+        };
 
-            if self.current.lan_addrs.is_empty() {
-                log::warn!("netmon: no LAN address");
-                continue;
-            }
+        // XXX
+        if self.current.lan_addrs.is_empty() {
+            log::warn!("netmon: no LAN address");
+            return false;
+        }
 
-            let current_lan_set: HashSet<_> = self
-                .current
-                .lan_addrs
-                .clone()
-                .into_iter()
-                .filter_map(|addr| match addr {
-                    IpNet::V4(ipv4_net) => Some(ipv4_net),
-                    IpNet::V6(_) => None,
-                })
-                .collect();
+        let current_lan_set: HashSet<_> = self
+            .current
+            .lan_addrs
+            .clone()
+            .into_iter()
+            .filter_map(|addr| match addr {
+                IpNet::V4(ipv4_net) => Some(ipv4_net),
+                IpNet::V6(_) => None,
+            })
+            .collect();
 
-            let new_lan_set: HashSet<_> = default_route_interface
-                .addrs()
-                .filter_map(|addr| match addr {
-                    netwatch::interfaces::IpNet::V4(ipv4_net) => Some(ipv4_net),
-                    _ => None,
-                })
-                .collect();
+        let new_lan_set: HashSet<_> = default_route_interface
+            .addrs()
+            .filter_map(|addr| match addr {
+                netwatch::interfaces::IpNet::V4(ipv4_net) => Some(ipv4_net),
+                _ => None,
+            })
+            .collect();
 
-            if current_lan_set != new_lan_set {
-                log::debug!(
-                    "netmon: local ip changed {:?} -> {:?}",
-                    current_lan_set,
-                    new_lan_set
-                );
-                if self.detect_public_ip_change() {
-                    log::info!("netmon: new public ip");
-                    return Ok(());
-                }
+        if current_lan_set != new_lan_set {
+            log::debug!(
+                "netmon: local ip changed {:?} -> {:?}",
+                current_lan_set,
+                new_lan_set
+            );
+            if self.update_and_detect_public_ip_change() {
+                log::info!("netmon: new public ip");
+                return true;
             }
         }
+        false
     }
-    pub fn detect_public_ip_change(&mut self) -> bool {
+    /// Update current NetInfo, and check if we have a new public IP.
+    /// If we went offline, or back online but with the same public IP
+    /// as before, this will return `false`
+    pub fn update_and_detect_public_ip_change(&mut self) -> bool {
         self.current = NetInfo::detect(&self.wg_if_name);
         if self.current.offline() {
             log::debug!("netmon: Offline");
@@ -184,6 +182,13 @@ impl NetworkMonitor {
         }
     }
 
+    fn reset(&mut self) {
+        self.current = NetInfo::default();
+    }
+
+    pub(crate) fn is_online(&self) -> bool {
+        self.current.online()
+    }
     pub(crate) fn get_current(&self) -> Option<NetInfo> {
         Some(self.current.clone())
     }
