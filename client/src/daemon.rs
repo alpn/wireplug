@@ -5,6 +5,9 @@ use std::{
     time::Duration,
 };
 
+use n0_future::StreamExt;
+use n0_watcher::{self, Watcher};
+
 use wireguard_control::Key;
 
 use crate::{
@@ -68,61 +71,55 @@ fn show_stats(ifname: &str, net_info: Option<NetInfo>, port: Option<u16>) -> any
 }
 
 pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyhow::Result<()> {
-    let mut netmon = netstat::NetworkMonitor::new(ifname).await?;
     let mut peers_manager = wg_interface::PeerTracker::new();
+    let mut netstate = netstat::NetworkState::new(ifname).await?;
+    let nm = netwatch::netmon::Monitor::new().await?;
+
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 
-    log::info!("monitoring interface: {ifname} | NAT travesal={traverse_nat}");
-
-    let mut port_to_announce = None;
-    loop {
+    tokio::spawn(async move {
+        /*
         if let Err(e) = show_stats(ifname, netmon.get_current(), port_to_announce) {
             log::warn!("could not show stats: {e}");
         }
+        */
+    });
 
+    log::info!("monitoring interface: {ifname} | NAT travesal={traverse_nat}");
+    let mut port_to_announce = None;
+
+    loop {
+        let mut nw_stream = nm.interface_state().stream_updates_only();
         let inactive_peers = tokio::select! {
             biased;
-            res = netmon.monitor_endpoint_change() => {
-                res?;
-                let new_port = utils::get_random_port();
-                port_to_announce = Some(match traverse_nat {
-                    true => {
-                        let nat_kind = match nat::detect_kind(new_port) {
-                            Ok(res) => res,
-                            Err(e) => {
-                                log::warn!("failed to perform NAT detection: {e}");
-                                thread::sleep(Duration::from_secs(5));
-                                continue;
-                            }
-                        };
-                        match nat_kind {
-                            nat::NatKind::Easy => new_port,
-                            nat::NatKind::FixedPortMapping(port_mapping_nat) => {
-                                port_mapping_nat.obsereved_port
-                            }
-                            nat::NatKind::Hard => {
-                                log::warn!("Destination-Dependent NAT detected");
-                                netmon.set_hard_nat(true);
-                                new_port
-                            }
-                        }
-                    }
-                    false => new_port,
-                });
-
-                log::debug!("updating listen port to {new_port} ..");
-                // wait before reusing the port
-                std::thread::sleep(Duration::from_secs(3));
-                wg_interface::update_port(ifname, new_port)?;
-                wg_interface::get_all_peers(ifname)?
+            state = nw_stream.next() => {
+                if netstate.has_endpoint_changed(state).await {
+                    port_to_announce = None;
+                }
+                continue;
 
             },
+            port = get_port_to_announce(traverse_nat), if port_to_announce.is_none() && netstate.is_online() => {
+                port_to_announce = port;
+                let Some(new_port) = port_to_announce else {
+                    continue;
+                };
+
+                log::debug!("updating listen port to {new_port:?} ..");
+                // wait before reusing the port
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                if let Err(e) = wg_interface::update_port(ifname, new_port) {
+                    log::error!("failed to update wg port: {e}");
+                    continue;
+                }
+                wg_interface::get_all_peers(ifname)?
+            },
             _ = tokio::time::sleep(Duration::from_secs(wg_interface::COMMON_PKA.into())) => {
-                if netmon.get_current().is_some_and(|c| c.online()) {
+                if netstate.is_online() {
                     wg_interface::get_inactive_peers_by_rx(ifname, &mut peers_manager)?
                 }
                 else {
-                    vec![]
+                    continue;
                 }
             }
         };
@@ -132,7 +129,7 @@ pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyho
         }
 
         log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
-        let Some(netinfo) = netmon.get_current() else {
+        let Some(netinfo) = netstate.get_current() else {
             log::warn!("no NetInfo - skipping");
             continue;
         };
@@ -146,7 +143,7 @@ pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyho
             inactive_peers,
             netinfo,
             port_to_announce,
-            netmon.needs_relay(),
+            netstate.needs_relay(),
         )?;
     }
 }
