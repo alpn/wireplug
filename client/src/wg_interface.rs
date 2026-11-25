@@ -14,10 +14,7 @@ use wireguard_control::{
     Backend, Device, DeviceUpdate, InterfaceName, Key, KeyPair, PeerConfigBuilder, PeerInfo,
 };
 
-use crate::{
-    config::{Config},
-    utils,
-};
+use crate::{config::Config, utils};
 
 pub const COMMON_PKA: u16 = 25;
 // WireGuard's rekey interval, and some

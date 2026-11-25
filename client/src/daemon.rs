@@ -16,6 +16,32 @@ use crate::{
     utils, wg_interface,
 };
 
+async fn get_port_to_announce(traverse_nat: bool) -> Option<u16> {
+    let new_port = utils::get_random_port();
+    let new_port = if traverse_nat {
+        let nat_kind = match nat::detect_kind(new_port) {
+            Ok(res) => res,
+            Err(e) => {
+                log::warn!("failed to perform NAT detection: {e}");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                return None;
+            }
+        };
+        match nat_kind {
+            nat::NatKind::Easy => new_port,
+            nat::NatKind::FixedPortMapping(port_mapping_nat) => port_mapping_nat.obsereved_port,
+            nat::NatKind::Hard => {
+                log::warn!("Destination-Dependent NAT detected");
+                new_port
+            }
+        }
+    } else {
+        new_port
+    };
+
+    Some(new_port)
+}
+
 pub(crate) fn handle_inactive_peers(
     ifname: &str,
     peer_tracker: &mut wg_interface::PeerTracker,
