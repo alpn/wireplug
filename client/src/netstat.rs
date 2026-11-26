@@ -127,12 +127,6 @@ impl NetworkState {
             return false;
         };
 
-        // XXX
-        if self.current.lan_addrs.is_empty() {
-            log::warn!("netmon: no LAN address");
-            return false;
-        }
-
         let current_lan_set: HashSet<_> = self
             .current
             .lan_addrs
