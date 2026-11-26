@@ -1,20 +1,26 @@
 use std::{
-    io::Write,
-    os::unix::net::UnixStream,
+    fmt::Write,
+    fs,
+    os::unix::fs::PermissionsExt,
+    sync::Arc,
     thread::{self},
     time::Duration,
 };
 
-use n0_future::StreamExt;
-use n0_watcher::{self, Watcher};
+use tokio::{io::AsyncWriteExt, net::UnixListener, sync::Mutex};
 
 use wireguard_control::Key;
 
+use n0_future::StreamExt;
+use n0_watcher::{self, Watcher};
+
 use crate::{
     announce, nat,
-    netstat::{self, NetInfo},
+    netstat::{self, NetInfo, NetworkState},
     utils, wg_interface,
 };
+
+static MON_SOCK: &str = "/var/run/wireplugd.sock";
 
 async fn get_port_to_announce(traverse_nat: bool) -> Option<u16> {
     let new_port = utils::get_random_port();
@@ -78,54 +84,101 @@ pub(crate) fn handle_inactive_peers(
     Ok(())
 }
 
-fn show_stats(ifname: &str, net_info: Option<NetInfo>, port: Option<u16>) -> anyhow::Result<()> {
-    let mut s = UnixStream::connect("/var/run/wireplugd.sock")?;
-    write!(s, "\x1B[2J\x1B[1;1H")?;
-    writeln!(s, "Network:\n-------")?;
-    match net_info {
-        Some(n) => writeln!(s, "{n}")?,
-        None => writeln!(s, "\tN/A\n")?,
+async fn serve_monitoring_socket(
+    unix_listener: UnixListener,
+    netstate: Arc<Mutex<NetworkState>>,
+    ifname: String,
+) -> anyhow::Result<()> {
+    loop {
+        let mut socket = match unix_listener.accept().await {
+            Ok((s, _)) => {
+                log::warn!("new monitoring client connected");
+                s
+            }
+            Err(e) => {
+                log::warn!("monitoring socket error: {e}");
+                break;
+            }
+        };
+        loop {
+            let mut s = String::new();
+            write!(s, "\x1B[2J\x1B[1;1H")?;
+            writeln!(s, "Network:\n-------")?;
+
+            match netstate.lock().await.get_current() {
+                Some(n) => writeln!(s, "{n}")?,
+                None => writeln!(s, "\tN/A\n")?,
+            }
+            write!(s, "\tWireGuard Port: ")?;
+            match wg_interface::get_port(&ifname) {
+                Some(p) => writeln!(s, "{p}")?,
+                None => writeln!(s, "N/A")?,
+            }
+            let peer_info = wg_interface::get_peer_info(&ifname)?;
+            s.write_str(&peer_info)?;
+            if let Err(e) = socket.write_all(s.as_bytes()).await {
+                log::warn!("bad monitoring client {e}");
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
-    write!(s, "\tWireGuard Port: ")?;
-    match port {
-        Some(p) => writeln!(s, "{p}")?,
-        None => writeln!(s, "N/A")?,
-    }
-    let peer_info = wg_interface::get_peer_info(ifname)?;
-    s.write_all(peer_info.as_bytes())?;
     Ok(())
 }
 
 pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyhow::Result<()> {
     let mut peers_manager = wg_interface::PeerTracker::new();
-    let mut netstate = netstat::NetworkState::new(ifname).await?;
-    let nm = netwatch::netmon::Monitor::new().await?;
+    let netstate = netstat::NetworkState::new(ifname).await?;
+    let shared_netstate = Arc::new(Mutex::new(netstate));
+    let netmon = netwatch::netmon::Monitor::new().await?;
 
     wg_interface::init_peers_activity(ifname, &mut peers_manager)?;
 
+    let task_netstate = Arc::clone(&shared_netstate);
+    let task_ifname = ifname.to_owned();
     tokio::spawn(async move {
-        /*
-        if let Err(e) = show_stats(ifname, netmon.get_current(), port_to_announce) {
-            log::warn!("could not show stats: {e}");
+        if let Err(e) = tokio::fs::remove_file(MON_SOCK).await {
+            log::warn!("failed to unlink monitoring socket {}: {e}", MON_SOCK);
+            return;
         }
-        */
+        match tokio::net::UnixListener::bind(MON_SOCK) {
+            Ok(unix_listener) => {
+                if let Err(e) =
+                    tokio::fs::set_permissions(MON_SOCK, fs::Permissions::from_mode(0o666)).await
+                {
+                    log::warn!(
+                        "failed to set permissions on monitoring socket {}: {e}",
+                        MON_SOCK
+                    );
+                    return;
+                }
+                if let Err(e) =
+                    serve_monitoring_socket(unix_listener, task_netstate, task_ifname).await
+                {
+                    log::error!("monitoring socket error: {e}");
+                }
+            }
+            Err(e) => {
+                log::error!("failed to bind monitoring socket {}: {e}", MON_SOCK);
+            }
+        }
     });
 
     log::info!("monitoring interface: {ifname} | NAT travesal={traverse_nat}");
     let mut port_to_announce = None;
 
     loop {
-        let mut nw_stream = nm.interface_state().stream_updates_only();
+        let mut netmon_update_stream = netmon.interface_state().stream_updates_only();
         let inactive_peers = tokio::select! {
             biased;
-            state = nw_stream.next() => {
-                if netstate.has_endpoint_changed(state).await {
+            state = netmon_update_stream.next() => {
+                if shared_netstate.lock().await.has_endpoint_changed(state).await {
                     port_to_announce = None;
                 }
                 continue;
 
             },
-            port = get_port_to_announce(traverse_nat), if port_to_announce.is_none() && netstate.is_online() => {
+            port = get_port_to_announce(traverse_nat), if port_to_announce.is_none() && shared_netstate.lock().await.is_online() => {
                 port_to_announce = port;
                 let Some(new_port) = port_to_announce else {
                     continue;
@@ -141,7 +194,7 @@ pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyho
                 wg_interface::get_all_peers(ifname)?
             },
             _ = tokio::time::sleep(Duration::from_secs(wg_interface::COMMON_PKA.into())) => {
-                if netstate.is_online() {
+                if shared_netstate.lock().await.is_online() {
                     wg_interface::get_inactive_peers_by_rx(ifname, &mut peers_manager)?
                 }
                 else {
@@ -155,7 +208,7 @@ pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyho
         }
 
         log::info!("{ifname} has {} INACTIVE peers", inactive_peers.len());
-        let Some(netinfo) = netstate.get_current() else {
+        let Some(netinfo) = shared_netstate.lock().await.get_current() else {
             log::warn!("no NetInfo - skipping");
             continue;
         };
@@ -169,7 +222,7 @@ pub(crate) async fn monitor_interface(ifname: &str, traverse_nat: bool) -> anyho
             inactive_peers,
             netinfo,
             port_to_announce,
-            netstate.needs_relay(),
+            shared_netstate.lock().await.needs_relay(),
         )?;
     }
 }
