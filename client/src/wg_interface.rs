@@ -93,6 +93,11 @@ pub(crate) fn show_config(ifname: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+pub(crate) fn get_port(ifname: &str) -> Option<u16> {
+    let ifname: InterfaceName = ifname.parse().ok()?;
+    Device::get(&ifname, Backend::default()).ok()?.listen_port
+}
+
 pub(crate) fn get_peer_info(ifname: &str) -> anyhow::Result<String> {
     let ifname: InterfaceName = ifname.parse()?;
     let dev = Device::get(&ifname, Backend::default())?;
