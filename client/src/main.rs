@@ -6,6 +6,7 @@ mod announce;
 mod config;
 mod daemon;
 mod nat;
+mod net_probe;
 #[cfg(target_os = "linux")]
 mod netlink;
 mod netstat;
@@ -26,13 +27,29 @@ enum LogLevelPicker {
 struct Cli {
     #[arg(long)]
     generate_config: bool,
-    interface_name: String,
+    #[arg(short, long, help = "Preform network probing and exit")]
+    net_probe: bool,
+    #[arg(required_unless_present = "net_probe")]
+    interface_name: Option<String>,
     #[arg(long)]
     no_config: bool,
     #[arg(long, help = "Do not perform NAT traversal")]
     no_nat: bool,
     #[arg(short, long)]
     log_level: Option<LogLevelPicker>,
+}
+
+fn start_net_probe() -> anyhow::Result<()> {
+    log::set_max_level(Level::Warn.to_level_filter());
+    log::set_logger(&LOGGER).map_err(|e| anyhow::Error::msg(format!("set_logger(): {e}")))?;
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    rt.block_on(net_probe::probe())?;
+
+    Ok(())
 }
 
 fn start(
@@ -69,7 +86,18 @@ fn start(
 
 fn main() {
     let cli = Cli::parse();
-    let ifname = &cli.interface_name;
+
+    if cli.net_probe {
+        if let Err(e) = start_net_probe() {
+            eprintln!("fatal: {e}");
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
+
+    let ifname = &cli
+        .interface_name
+        .expect("interface_name is required when net_probe is absent");
 
     if cli.generate_config {
         match config::generate_example_to_file(ifname) {
@@ -79,7 +107,6 @@ fn main() {
         return;
     }
 
-    let traverse_nat = !cli.no_nat;
     let log_level = match cli.log_level {
         Some(level) => match level {
             LogLevelPicker::Default => Level::Info,
@@ -89,6 +116,7 @@ fn main() {
         None => Level::Info,
     };
 
+    let traverse_nat = !cli.no_nat;
     if let Err(e) = start(ifname, cli.no_config, log_level, traverse_nat) {
         eprintln!("fatal: {e}");
         std::process::exit(1);

@@ -54,7 +54,7 @@ impl Display for NetInfo {
     }
 }
 impl NetInfo {
-    fn detect(if_name: &str) -> Self {
+    pub(crate) fn detect(if_name: &str) -> Self {
         let (mut wan_ipv4, mut wan_ipv6) = innernet_publicip::get_both();
         if wan_ipv4.is_none() && wan_ipv6.is_none() {
             (wan_ipv4, wan_ipv6) = utils::get_ip64_over_https();
